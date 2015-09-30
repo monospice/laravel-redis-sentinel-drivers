@@ -1,0 +1,22 @@
+formatter.name: pretty
+
+extensions:
+    - PhpSpec\Extensions\CodeCoverageExtension
+
+suites:
+    spec:
+        namespace: Monospice\Skeleton\Tests\Spec
+        psr4_prefix: Monospice\Skeleton\Tests\Spec
+        spec_path: tests/spec
+        src_path: src
+        spec_prefix:
+
+code_coverage:
+    whitelist:
+        - src
+    format:
+        - html
+        - clover
+    output:
+        - html: build/coverage
+        - clover: build/coverage.xml

@@ -1,0 +1,12 @@
+; EditorConfig: maintain a consistent coding style between editors.
+; Check if a plugin exists for your editor at http://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_size = 4
+indent_style = space
+trim_trailing_whitespace = true
