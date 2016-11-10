@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<ruleset name="Monospice">
+
+    <description>Coding standard used by Monospice packages</description>
+
+    <!-- PHPCS Configuration Options -->
+    <config name="colors" value="1"/>
+
+    <!-- Show progress while analyzing files -->
+    <arg value="p"/>
+
+    <!-- Check these files -->
+    <file>./src/</file>
+
+    <!-- Use the following coding standards -->
+    <rule ref="PSR2"/>
+    <rule ref="PEAR.Commenting">
+        <!-- Disable check for file-level docblock for now-->
+        <exclude name="PEAR.Commenting.FileComment"/>
+    </rule>
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+    <rule ref="Generic.CodeAnalysis.UnconditionalIfStatement"/>
+    <rule ref="Generic.Commenting.DocComment"/>
+    <rule ref="Generic.Commenting.Fixme"/>
+    <rule ref="Generic.Commenting.Todo"/>
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="80"/>
+            <property name="absoluteLineLimit" value="0"/>
+        </properties>
+    </rule>
+    <rule ref="Generic.Functions.CallTimePassByReference"/>
+
+</ruleset>

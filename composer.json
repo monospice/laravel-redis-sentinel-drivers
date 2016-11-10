@@ -1,7 +1,7 @@
 {
-    "name": "monospice/skeleton-project",
-    "description": "A skeleton project for Monospice packages.",
-    "keywords": ["skeleton", "example"],
+    "name": "monospice/laravel-redis-sentinel-drivers",
+    "description": "Laravel configuration wrapper for highly-available Redis Sentinel replication.",
+    "keywords": ["redis", "sentinel", "laravel"],
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -11,22 +11,28 @@
         }
     ],
     "require": {
-        "php": ">=5.4.0"
+        "php": ">=5.4.0",
+        "illuminate/cache": "^5.0",
+        "illuminate/queue": "^5.0",
+        "illuminate/redis": "^5.0",
+        "illuminate/session": "^5.0",
+        "illuminate/support": "^5.0",
+        "monospice/spicy-identifiers": "1.0.x-dev",
+        "predis/predis": "^1.1"
     },
     "require-dev": {
-        "phpspec/phpspec": "~2.3",
-        "henrikbjorn/phpspec-code-coverage": "^2.1",
-        "mockery/mockery": "0.9.*"
+        "laravel/framework": "^5.0",
+        "mockery/mockery": "0.9.*",
+        "phpunit/phpunit": "^4.8"
     },
     "autoload": {
         "psr-4": {
-            "Monospice\\Skeleton\\": "src/"
+            "Monospice\\LaravelRedisSentinel\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Monospice\\Skeleton\\Tests\\": "tests/",
-            "Monospice\\Skeleton\\Tests\\Spec\\": "tests/spec/"
-         }
+            "Monospice\\LaravelRedisSentinel\\Tests\\": "tests/"
+        }
     }
 }
