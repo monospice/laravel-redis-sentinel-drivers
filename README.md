@@ -317,9 +317,13 @@ array:
 
 ```php
 ...
-'redis-sentinel' => [
-    'driver' => 'redis-sentinel',
-    'connection' => 'default',
+'stores' => [
+    ...
+    'redis-sentinel' => [
+        'driver' => 'redis-sentinel',
+        'connection' => 'default',
+    ],
+    ...
 ],
 ...
 ```
@@ -334,9 +338,9 @@ connection.
 ### Session
 
 Set the `SESSION_DRIVER` environment variable to `redis-sentinel` in `.env` and
-set the `'connection'` directive to `'default'` or the name of the specific
+set the `'connection'` directive to `'default'`, or the name of the specific
 connection you created for storing sessions in the `'redis-sentinel'` database
-configuration in `config/session.php`.
+configuration, in `config/session.php`.
 
 ### Queue
 
@@ -345,11 +349,15 @@ Add the following connection definition to `config/queue.php` in the
 
 ```php
 ...
-'redis-sentinel' => [
-    'driver' => 'redis-sentinel',
-    'connection' => 'default',
-    'queue' => 'default',
-    'expire' => 60,
+'connections' => [
+    ...
+    'redis-sentinel' => [
+        'driver' => 'redis-sentinel',
+        'connection' => 'default',
+        'queue' => 'default',
+        'expire' => 60,
+    ],
+    ...
 ],
 ...
 ```
@@ -390,14 +398,17 @@ To use this feature, add the following configuration directive to the root of
 the `'redis'` connection definition in `config/database.php`:
 
 ```php
+...
 'redis' => [
     ...
     'redis_driver' => env('REDIS_DRIVER', 'default'),
     ...
 ],
+...
 ```
 
-...and add the environment variable `REDIS_DRIVER` to `sentinel` in `.env`.
+...and add the environment variable `REDIS_DRIVER` with the value `sentinel` to
+`.env`.
 
 When enabled, Redis commands executed through the `Redis` facade or the `redis`
 service (`app('redis')`, etc) will operate using the Sentinel connections.
