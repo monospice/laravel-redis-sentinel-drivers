@@ -36,6 +36,8 @@ Requirements
 - [Laravel][laravel] 5.0 or greater (Laravel 4.x doesn't support the required
   Predis version)
 
+**Note:** This package does not yet support the newly-released Laravel 5.4.
+
 This Readme assumes prior knowledge of configuring [Redis][redis] for [Redis
 Sentinel][sentinel] and [using Redis with Laravel][laravel-redis-docs].
 
