@@ -9,7 +9,7 @@ replication.**
 
 [Redis Sentinel][sentinel] provides high-availability, monitoring, and
 load-balancing for Redis servers configured for master-slave replication.
-[Laravel][laravel] includes built-in support for Redis, but cannot configure
+[Laravel][laravel] includes built-in support for Redis, but we cannot configure
 Sentinel setups flexibly out-of-the-box. This limits configuration of Sentinel
 to a single service.
 
@@ -47,17 +47,21 @@ Installation
 We're using Laravel, so we'll install through composer, of course!
 
 ```
-composer require monospice/laravel-redis-sentinel-driver
+composer require monospice/laravel-redis-sentinel-drivers
 ```
 
-If you're not already using Redis with Laravel, this will install the
+If the project does not already use Redis with Laravel, this will install the
 [Predis][predis] package as well.
 
 To use the drivers, add the package's service provider to `config/app.php`:
 
 ```php
 ...
-Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider::class,
+'providers' => [
+    ...
+    Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider::class,
+    ...
+],
 ...
 ```
 
@@ -259,7 +263,7 @@ us to clear our application cache without erasing user sessions.
 Our example setup includes a second set of Redis servers for storing feed data.
 The example Sentinel servers contain configuration for the first set with the
 service name, `mymaster`, and for the secord set with the service name,
-`feed-data`.  The local connection options allow us to specify which service
+`feed-service`.  The local connection options allow us to specify which service
 the connection makes requests for. As you can see, we set the service name of
 the `'feed'` connection to `'feed-service'`.
 
@@ -368,9 +372,9 @@ Add the following connection definition to `config/queue.php` in the
 `.env`.
 
 If you created a specific connection in the `'redis-sentinel'` database
-configuration for the queue, replace `'default'` with the name of the
-connection. If desired, replace the value of `'queue'` with the name of the
-queue you'd like to use.
+configuration for the queue, replace `'connection' => 'default'` with the name
+of the connection. If desired, replace the value of `'queue'` with the name of
+the queue you'd like to use.
 
 
 Using Sentinel Connections for Standalone Redis Commands
@@ -449,7 +453,11 @@ To use the facade, add the following alias to the `'aliases'` array in
 
 ```php
 ...
-'RedisSentinel' => Monospice\LaravelRedisSentinel\RedisSentinel::class,
+'aliases' => [
+    ...
+    'RedisSentinel' => Monospice\LaravelRedisSentinel\RedisSentinel::class,
+    ...
+],
 ...
 ```
 
