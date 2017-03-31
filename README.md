@@ -1,8 +1,8 @@
 Laravel Drivers for Redis Sentinel
 ==================================
 
-[![Build Status](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers.svg?branch=1.0.x)](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/badges/quality-score.png?b=1.0.x)](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/?branch=1.0.x)
+[![Build Status](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers.svg?branch=2.0.x)](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers)
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/badges/quality-score.png?b=2.0.x)](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/?branch=2.0.x)
 
 **Laravel configuration wrapper for highly-available Redis Sentinel
 replication.**
