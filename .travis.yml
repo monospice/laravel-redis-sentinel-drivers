@@ -8,7 +8,27 @@ php:
     - 7.1
     - hhvm
 
+env:
+    - LARAVEL_VERSION=5.0.*
+    - LARAVEL_VERSION=5.1.*
+    - LARAVEL_VERSION=5.2.*
+    - LARAVEL_VERSION=5.3.*
+
+matrix:
+    exclude:
+        - php: 5.4
+          env: LARAVEL_VERSION=5.1.*
+        - php: 5.4
+          env: LARAVEL_VERSION=5.2.*
+        - php: 5.4
+          env: LARAVEL_VERSION=5.3.*
+        - php: 5.5
+          env: LARAVEL_VERSION=5.3.*
+        - php: 7.1
+          env: LARAVEL_VERSION=5.0.*
+
 before_script:
+    - if [ -n "$LARAVEL_VERSION" ]; then composer require --no-update "laravel/framework:$LARAVEL_VERSION"; fi
     - composer install --prefer-source --no-interaction
 
 script:

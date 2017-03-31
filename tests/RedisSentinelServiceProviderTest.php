@@ -52,9 +52,12 @@ class RedisSentinelServiceProviderTest extends TestCase
         // For running tests against Laravel Framework < 5.3, we need to set
         // up encryption to boot the Queue services
         if (Application::VERSION < 5.3) {
-            if (Application::VERSION < 5.2) {
+            if (Application::VERSION < 5.1) {
                 $testKey = Str::random(16);
                 $cipher = MCRYPT_RIJNDAEL_128;
+            } elseif (Application::VERSION < 5.2) {
+                $testKey = Str::random(16);
+                $cipher = 'AES-128-CBC';
             } else {
                 $testKey = 'base64:' . base64_encode(random_bytes(16));
                 $cipher = 'AES-128-CBC';
