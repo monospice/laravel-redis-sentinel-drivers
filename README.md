@@ -1,8 +1,8 @@
 Laravel Drivers for Redis Sentinel
 ==================================
 
-[![Build Status](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers.svg?branch=master)](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/?branch=master)
+[![Build Status](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers.svg?branch=1.0.x)](https://travis-ci.org/monospice/laravel-redis-sentinel-drivers)
+[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/badges/quality-score.png?b=1.0.x)](https://scrutinizer-ci.com/g/monospice/laravel-redis-sentinel-drivers/?branch=1.0.x)
 
 **Laravel configuration wrapper for highly-available Redis Sentinel
 replication.**
@@ -36,7 +36,9 @@ Requirements
 - [Laravel][laravel] 5.0 or greater (Laravel 4.x doesn't support the required
   Predis version)
 
-**Note:** This package does not yet support the newly-released Laravel 5.4.
+**Note:** Laravel 5.4 introduced the ability to use the [PhpRedis][php-redis]
+extension as a Redis client for the framework. This package does not yet
+support the PhpRedis option.
 
 This Readme assumes prior knowledge of configuring [Redis][redis] for [Redis
 Sentinel][sentinel] and [using Redis with Laravel][laravel-redis-docs].
@@ -46,8 +48,16 @@ Installation
 
 We're using Laravel, so we'll install through composer, of course!
 
+**For Laravel 5.4 and above:**
+
 ```
 composer require monospice/laravel-redis-sentinel-drivers
+```
+
+**For Laravel 5.3 and below:**
+
+```
+composer require monospice/laravel-redis-sentinel-drivers:^1.0
 ```
 
 If the project does not already use Redis with Laravel, this will install the
@@ -407,7 +417,7 @@ the `'redis'` connection definition in `config/database.php`:
 ...
 'redis' => [
     ...
-    'redis_driver' => env('REDIS_DRIVER', 'default'),
+    'driver' => env('REDIS_DRIVER', 'default'),
     ...
 ],
 ...
@@ -425,11 +435,11 @@ local environments and switch to a full Sentinel set of servers in production.
 Connecting to Sentinel Directly
 -------------------------------
 
-If a developer wishes to send Redis commands to a Sentinel server directly,
-like, for example, through the `Redis` facade, but doesn't want to override
-Laravel's Redis API as above, he or she can use the `RedisSentinel` facade
-provided by this package or resolve the database driver from the application
-container:
+If a developer wishes to send Redis commands to Redis instances behind a
+Sentinel server directly, like, for example, through the `Redis` facade, but
+doesn't want to override Laravel's Redis API as above, he or she can use the
+`RedisSentinel` facade provided by this package or resolve the database driver
+from the application container:
 
 ```php
 // Uses the 'some-connection' connection defined in the 'redis-sentinel'
@@ -485,4 +495,5 @@ information.
 [sentinel]: http://redis.io/topics/sentinel
 [predis]: https://github.com/nrk/predis
 [predis-docs]: https://github.com/nrk/predis/wiki
+[php-redis]: https://github.com/phpredis/phpredis
 [laravel-redis-docs]: https://laravel.com/docs/redis
