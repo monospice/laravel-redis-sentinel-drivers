@@ -10,7 +10,7 @@ use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
-use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
+use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 
 /**
  * Registers the "redis-sentinel" driver as an available driver for Laravel's
@@ -20,7 +20,7 @@ use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
  * @package  Monospice\LaravelRedisSentinel
  * @author   Cy Rossignol <cy@rossignols.me>
  * @license  See LICENSE file
- * @link     http://github.com/monospice/laravel-redis-sentinel-driver
+ * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
  */
 class RedisSentinelServiceProvider extends ServiceProvider
 {
@@ -40,7 +40,9 @@ class RedisSentinelServiceProvider extends ServiceProvider
         // "redis" service from the list of deferred services in the container:
         if ($this->shouldOverrideLaravelApi()) {
             $deferredServices = $this->app->getDeferredServices();
+
             unset($deferredServices['redis']);
+            unset($deferredServices['redis.connection']);
 
             $this->app->setDeferredServices($deferredServices);
         }
@@ -56,16 +58,21 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $this->app->singleton('redis-sentinel', function ($app) {
             $config = $app->make('config')->get('database.redis-sentinel');
+            $driver = Arr::pull($config, 'client', 'predis');
 
-            return new RedisSentinelDatabase($config);
+            return new RedisSentinelManager($driver, $config);
         });
 
         // If we want Laravel's Redis API to use Sentinel, we'll return an
-        // instance of the RedisSentinelDatabase when requesting the "redis"
+        // instance of the RedisSentinelManager when requesting the "redis"
         // service:
         if ($this->shouldOverrideLaravelApi()) {
             $this->app->singleton('redis', function ($app) {
                 return $app->make('redis-sentinel');
+            });
+
+            $this->app->bind('redis.connection', function ($app) {
+                return $app->make('redis-sentinel')->connection();
             });
         }
     }

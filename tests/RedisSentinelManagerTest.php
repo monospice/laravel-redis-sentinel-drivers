@@ -3,18 +3,20 @@
 namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Closure;
-use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
+use Illuminate\Redis\RedisManager;
+use InvalidArgumentException;
+use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use PHPUnit_Framework_TestCase as TestCase;
 use Predis\Connection\Aggregate\SentinelReplication;
 
-class RedisSentinelDatabaseTest extends TestCase
+class RedisSentinelManagerTest extends TestCase
 {
     /**
-     * The instance of the database driver subject under test
+     * The instance of the manager subject under test
      *
-     * @var RedisSentinelDatabase
+     * @var RedisSentinelManager
      */
-    protected $database;
+    protected $manager;
 
     /**
      * Run this setup before each test
@@ -26,27 +28,23 @@ class RedisSentinelDatabaseTest extends TestCase
         $config = require(__DIR__ . '/stubs/config.php');
         $config = $config['database']['redis-sentinel'];
 
-        $this->database = new RedisSentinelDatabase($config);
+        $this->manager = new RedisSentinelManager('predis', $config);
     }
 
     public function testIsInitializable()
     {
-        $class = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
-
-        $this->assertInstanceOf($class, $this->database);
+        $this->assertInstanceOf(RedisSentinelManager::class, $this->manager);
     }
 
-    public function testExtendsRedisDatabaseForSwapability()
+    public function testExtendsRedisManagerForSwapability()
     {
-        $extends = 'Illuminate\Redis\Database';
-
-        $this->assertInstanceOf($extends, $this->database);
+        $this->assertInstanceOf(RedisManager::class, $this->manager);
     }
 
     public function testCreatesSentinelPredisClientsForEachConnection()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->manager->connection('connection1');
+        $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $options = $client->getOptions();
@@ -54,7 +52,7 @@ class RedisSentinelDatabaseTest extends TestCase
 
             $this->assertInstanceOf('Closure', $replicationOption);
 
-            $expectedClass = 'Predis\Connection\Aggregate\SentinelReplication';
+            $expectedClass = SentinelReplication::class;
             $replicationClass = $replicationOption([], $options);
 
             $this->assertInstanceOf($expectedClass, $replicationClass);
@@ -63,8 +61,8 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testSetsSentinelConnectionOptionsFromConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->manager->connection('connection1');
+        $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $connection = $client1->getConnection();
@@ -80,8 +78,8 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testCreatesSingleClientsWithSharedConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->manager->connection('connection1');
+        $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $expected = [ 'password' => 'secret', 'database' => 0 ];
@@ -93,10 +91,35 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testCreatesSingleClientsWithIndividualConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->manager->connection('connection1');
+        $client2 = $this->manager->connection('connection2');
 
         $this->assertEquals('mymaster', $client1->getOptions()->service);
         $this->assertEquals('another-master', $client2->getOptions()->service);
+    }
+
+    public function testDisallowsRedisClusterConnections()
+    {
+        $this->setExpectedException(InvalidArgumentException::class);
+
+        $this->manager->connection('clustered_connection');
+    }
+
+    public function testFailsOnUndefinedConnection()
+    {
+        $this->setExpectedException(InvalidArgumentException::class);
+
+        $this->manager->connection('nonexistant_connection');
+    }
+
+    public function testFailsOnUnsupportedClientDriver()
+    {
+        $this->setExpectedException(InvalidArgumentException::class);
+
+        $manager = new RedisSentinelManager('phpredis', [
+            'test_connection' => [ ],
+        ]);
+
+        $manager->connection('test_connection');
     }
 }

@@ -4,14 +4,12 @@ namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
-use Illuminate\Encryption\EncryptionServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Queue\QueueServiceProvider;
-use Illuminate\Redis\Database as RedisDatabase;
+use Illuminate\Redis\RedisManager;
 use Illuminate\Redis\RedisServiceProvider;
 use Illuminate\Session\SessionServiceProvider;
-use Illuminate\Support\Str;
-use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
+use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider;
 use PHPUnit_Framework_TestCase as TestCase;
 
@@ -49,31 +47,15 @@ class RedisSentinelServiceProviderTest extends TestCase
         $this->app->register(new RedisServiceProvider($this->app));
         $this->app->register(new SessionServiceProvider($this->app));
 
-        // For running tests against Laravel Framework < 5.3, we need to set
-        // up encryption to boot the Queue services
-        if (Application::VERSION < 5.3) {
-            if (Application::VERSION < 5.2) {
-                $testKey = Str::random(16);
-                $cipher = MCRYPT_RIJNDAEL_128;
-            } else {
-                $testKey = 'base64:' . base64_encode(random_bytes(16));
-                $cipher = 'AES-128-CBC';
-            }
-
-            $this->app->config->set('app.key', $testKey);
-            $this->app->config->set('app.cipher', $cipher);
-
-            $this->app->register(new EncryptionServiceProvider($this->app));
-        }
-
         $this->provider = new RedisSentinelServiceProvider($this->app);
     }
 
     public function testIsInitializable()
     {
-        $class = 'Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider';
-
-        $this->assertInstanceOf($class, $this->provider);
+        $this->assertInstanceOf(
+            RedisSentinelServiceProvider::class,
+            $this->provider
+        );
     }
 
     public function testRegistersWithApplication()
@@ -83,9 +65,8 @@ class RedisSentinelServiceProviderTest extends TestCase
         $this->assertArrayHasKey('redis-sentinel', $this->app);
 
         $service = $this->app->make('redis-sentinel');
-        $class = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
 
-        $this->assertInstanceOf($class, $service);
+        $this->assertInstanceOf(RedisSentinelManager::class, $service);
     }
 
     public function testRegisterPreservesStandardRedisApi()
@@ -94,9 +75,8 @@ class RedisSentinelServiceProviderTest extends TestCase
         $this->provider->register();
 
         $redisService = $this->app->make('redis');
-        $class = 'Illuminate\Redis\Database';
 
-        $this->assertInstanceOf($class, $redisService);
+        $this->assertInstanceOf(RedisManager::class, $redisService);
     }
 
     public function testRegisterOverridesStandardRedisApi()
@@ -105,9 +85,8 @@ class RedisSentinelServiceProviderTest extends TestCase
         $this->provider->boot();
 
         $redisService = $this->app->make('redis');
-        $class = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
 
-        $this->assertInstanceOf($class, $redisService);
+        $this->assertInstanceOf(RedisSentinelManager::class, $redisService);
     }
 
     public function testBootExtendsCacheStores()

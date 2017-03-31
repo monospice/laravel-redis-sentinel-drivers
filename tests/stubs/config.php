@@ -41,6 +41,12 @@ return [
                 'retry_wait' => 9999,       // Predis default: 1000
                 'update_sentinels' => true, // Predis default: false
             ],
+            // This package does not support Redis Cluster connections
+            // available in Laravel 5.4+
+            'clusters' => [
+                'clustered_connection' => [
+                ],
+            ]
         ],
     ],
 
