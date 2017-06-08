@@ -31,7 +31,7 @@ class RedisSentinelManager extends RedisManager
     /**
      * Get the Redis Connection instance represented by the specified name
      *
-     * @param string $name The name of the connection as defined in the
+     * @param string|null $name The name of the connection as defined in the
      * configuration
      *
      * @return \Illuminate\Redis\Connections\PredisConnection The configured
