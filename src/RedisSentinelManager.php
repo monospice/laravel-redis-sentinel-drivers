@@ -42,7 +42,7 @@ class RedisSentinelManager extends RedisManager
      * @throws InvalidArgumentException If the specified connection is not
      * defined in the configuration
      */
-    protected function resolve($name)
+    public function resolve($name)
     {
         $options = Arr::get($this->config, 'options', [ ]);
 
