@@ -4,6 +4,7 @@ namespace Monospice\LaravelRedisSentinel;
 
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\RedisStore;
+use Illuminate\Foundation\Application;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Queue\Connectors\RedisConnector;
 use Illuminate\Session\CacheBasedSessionHandler;
@@ -11,6 +12,7 @@ use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
+use Monospice\LaravelRedisSentinel\Manager;
 
 /**
  * Registers the "redis-sentinel" driver as an available driver for Laravel's
@@ -56,25 +58,38 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('redis-sentinel', function ($app) {
+        $class = $this->getVersionedRedisSentinelManagerClass();
+
+        $this->app->singleton('redis-sentinel', function ($app) use ($class) {
             $config = $app->make('config')->get('database.redis-sentinel');
             $driver = Arr::pull($config, 'client', 'predis');
 
-            return new RedisSentinelManager($driver, $config);
+            return new RedisSentinelManager(new $class($driver, $config));
         });
 
         // If we want Laravel's Redis API to use Sentinel, we'll return an
         // instance of the RedisSentinelManager when requesting the "redis"
         // service:
         if ($this->shouldOverrideLaravelApi()) {
-            $this->app->singleton('redis', function ($app) {
-                return $app->make('redis-sentinel');
-            });
-
-            $this->app->bind('redis.connection', function ($app) {
-                return $app->make('redis-sentinel')->connection();
-            });
+            $this->registerOverrides();
         }
+    }
+
+    /**
+     * Replace the standard Laravel Redis service with the Redis Sentinel
+     * database driver so all redis operations use Sentinel connections.
+     *
+     * @return void
+     */
+    protected function registerOverrides()
+    {
+        $this->app->singleton('redis', function ($app) {
+            return $app->make('redis-sentinel');
+        });
+
+        $this->app->bind('redis.connection', function ($app) {
+            return $app->make('redis-sentinel')->connection();
+        });
     }
 
     /**
@@ -88,7 +103,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
     protected function addRedisSentinelCacheDriver(CacheManager $cache)
     {
         $cache->extend('redis-sentinel', function ($app, $conf) use ($cache) {
-            $redis = $app['redis-sentinel'];
+            $redis = $app->make('redis-sentinel')->getVersionedManager();
             $prefix = $app->make('config')->get('cache.prefix');
             $connection = Arr::get($conf, 'connection', 'default');
             $store = new RedisStore($redis, $prefix, $connection);
@@ -130,16 +145,16 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     protected function addRedisSentinelQueueConnector(QueueManager $queue)
     {
-        $app = $this->app;
+        $queue->extend('redis-sentinel', function () {
+            $redis = $this->app->make('redis-sentinel')->getVersionedManager();
 
-        $queue->extend('redis-sentinel', function () use ($app) {
-            return new RedisConnector($app->make('redis-sentinel'));
+            return new RedisConnector($redis);
         });
     }
 
     /**
-     * Determine this package should replace Laravel's Redis API ("Redis"
-     * facade and "redis" service binding)
+     * Determine whether this package should replace Laravel's Redis API
+     * ("Redis" facade and "redis" service binding).
      *
      * @return bool True if "database.redis.driver" configuration option is
      * set to "sentinel"
@@ -149,5 +164,21 @@ class RedisSentinelServiceProvider extends ServiceProvider
         $driver = $this->app->make('config')->get('database.redis.driver');
 
         return $driver === 'sentinel';
+    }
+
+    /**
+     * Get the fully-qualified class name of the RedisSentinelManager class
+     * for the current version of Laravel.
+     *
+     * @return string The class name of the appropriate RedisSentinelManager
+     * with its namespace
+     */
+    protected function getVersionedRedisSentinelManagerClass()
+    {
+        if (version_compare(Application::VERSION, '5.4.20', 'lt')) {
+            return Manager\Laravel540RedisSentinelManager::class;
+        }
+
+        return Manager\Laravel5420RedisSentinelManager::class;
     }
 }

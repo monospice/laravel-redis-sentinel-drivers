@@ -2,14 +2,14 @@
 
 namespace Monospice\LaravelRedisSentinel;
 
-use Illuminate\Redis\RedisManager;
-use Illuminate\Support\Arr;
-use InvalidArgumentException;
-use Monospice\LaravelRedisSentinel\Connectors;
+use Illuminate\Contracts\Redis\Factory;
+use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
+use Monospice\SpicyIdentifiers\DynamicMethod;
 
 /**
  * Enables Laravel's Redis database driver to accept configuration options for
- * Redis Sentinel connections independently.
+ * Redis Sentinel connections independently. Replaces Laravel's RedisManager
+ * for Redis Sentinel connections.
  *
  * By default, Laravel's Redis service permits a single set of configuration
  * options for all of the Redis connections passed to the Predis client. This
@@ -20,68 +20,79 @@ use Monospice\LaravelRedisSentinel\Connectors;
  * for each connection in the "redis-sentinel" block of the database
  * configuration which it will use to configure individual clients.
  *
+ * Laravel changed the public interface of the RedisManager class in version
+ * 5.4.20. Because this package extends the functionality of that class, the
+ * implementation needed to change to match the modified interface. To avoid
+ * frivolous package versioning and simplify installation and upgrade through
+ * composer, this class handles any small differences between minor Laravel
+ * versions by wrapping implementations of RedisSentinelManager for each
+ * diverging Laravel version.
+ *
  * @category Package
  * @package  Monospice\LaravelRedisSentinel
  * @author   Cy Rossignol <cy@rossignols.me>
  * @license  See LICENSE file
  * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
  */
-class RedisSentinelManager extends RedisManager
+class RedisSentinelManager implements Factory
 {
     /**
-     * Get the Redis Connection instance represented by the specified name
+     * The RedisSentinelManager instance for the current version of Laravel
      *
-     * @param string $name The name of the connection as defined in the
-     * configuration
-     *
-     * @return \Illuminate\Redis\Connections\PredisConnection The configured
-     * Redis Connection instance
-     *
-     * @throws InvalidArgumentException If attempting to initialize a Redis
-     * Cluster connection
-     * @throws InvalidArgumentException If the specified connection is not
-     * defined in the configuration
+     * @var VersionedRedisSentinelManager
      */
-    protected function resolve($name)
+    private $versionedManager;
+
+    /**
+     * Wrap the provided RedisSentinelManager instance that manages Sentinel
+     * connections for the current version of Laravel.
+     *
+     * @param VersionedRedisSentinelManager $versionedManager Manages Redis
+     * Sentinel connections for the current version of Laravel
+     */
+    public function __construct(VersionedRedisSentinelManager $versionedManager)
     {
-        $options = Arr::get($this->config, 'options', [ ]);
-
-        if (isset($this->config[$name])) {
-            return $this->connector()->connect($this->config[$name], $options);
-        }
-
-        if (isset($this->config['clusters']['name'])) {
-            throw new InvalidArgumentException(
-                'Redis Sentinel connections do not support Redis Cluster.'
-            );
-        }
-
-        throw new InvalidArgumentException(
-            'The Redis Sentinel connection [' . $name . '] is not defined.'
-        );
+        $this->versionedManager = $versionedManager;
     }
 
     /**
-     * Get the appropriate Connector instance for the current client driver
+     * Get the current RedisSentinelManager instance that manages Sentinel
+     * connections for the current version of Laravel.
      *
-     * @return Connectors\PredisConnector The Connector instance for the
-     * current driver
-     *
-     * @throws InvalidArgumentException If the current client driver is not
-     * supported
+     * @return VersionedRedisSentinelManager The versioned implementation of
+     * RedisSentinelManager
      */
-    protected function connector()
+    public function getVersionedManager()
     {
-        switch ($this->driver) {
-            case 'predis':
-                return new Connectors\PredisConnector();
-        }
+        return $this->versionedManager;
+    }
 
-        throw new InvalidArgumentException(
-            'Unsupported Redis Sentinel client driver [' . $this->driver . ']. '
-            . 'The monospice/laravel-redis-sentinel-drivers package currently '
-            . 'supports only the "predis" client. Support for the "phpredis" '
-            . 'client will be added in the future.'
-        );
+    /**
+     * Get a Redis Sentinel connection by name.
+     *
+     * @param string|null $name The name of the connection as defined in the
+     * application's configuration
+     *
+     * @return \Illuminate\Redis\Connections\Connection The requested Redis
+     * Sentinel connection
+     */
+    public function connection($name = null)
+    {
+        return $this->versionedManager->connection($name);
+    }
+
+    /**
+     * Pass method calls to the RedisSentinelManager instance for the current
+     * version of Laravel.
+     *
+     * @param string $methodName The name of the called method
+     * @param array  $arguments  The arguments passed to the called method
+     *
+     * @return mixed The return value from the underlying method
+     */
+    public function __call($methodName, array $arguments)
+    {
+        return DynamicMethod::from($methodName)
+            ->callOn($this->versionedManager, $arguments);
     }
 }

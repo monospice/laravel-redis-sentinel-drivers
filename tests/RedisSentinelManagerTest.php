@@ -2,12 +2,12 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests;
 
-use Closure;
-use Illuminate\Redis\RedisManager;
-use InvalidArgumentException;
+use Illuminate\Contracts\Redis\Factory as RedisFactory;
+use Illuminate\Redis\Connections\Connection;
+use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
+use Mockery;
 use PHPUnit_Framework_TestCase as TestCase;
-use Predis\Connection\Aggregate\SentinelReplication;
 
 class RedisSentinelManagerTest extends TestCase
 {
@@ -19,16 +19,23 @@ class RedisSentinelManagerTest extends TestCase
     protected $manager;
 
     /**
+     * A mock instance of the abstract VersionedRedisSentinelManager class
+     *
+     * @var VersionedRedisSentinelManager
+     */
+    protected $versionedManagerMock;
+
+    /**
      * Run this setup before each test
      *
      * @return void
      */
     public function setUp()
     {
-        $config = require(__DIR__ . '/stubs/config.php');
-        $config = $config['database']['redis-sentinel'];
+        $this->versionedManagerMock
+            = Mockery::mock(VersionedRedisSentinelManager::class);
 
-        $this->manager = new RedisSentinelManager('predis', $config);
+        $this->manager = new RedisSentinelManager($this->versionedManagerMock);
     }
 
     public function testIsInitializable()
@@ -36,90 +43,39 @@ class RedisSentinelManagerTest extends TestCase
         $this->assertInstanceOf(RedisSentinelManager::class, $this->manager);
     }
 
-    public function testExtendsRedisManagerForSwapability()
+    public function testImplementsRedisFactoryForSwapability()
     {
-        $this->assertInstanceOf(RedisManager::class, $this->manager);
+        $this->assertInstanceOf(RedisFactory::class, $this->manager);
     }
 
-    public function testCreatesSentinelPredisClientsForEachConnection()
+    public function testGetsVersionedRedisSentinelManagerInstance()
     {
-        $client1 = $this->manager->connection('connection1');
-        $client2 = $this->manager->connection('connection2');
-
-        foreach ([ $client1, $client2 ] as $client) {
-            $options = $client->getOptions();
-            $replicationOption = $options->replication;
-
-            $this->assertInstanceOf('Closure', $replicationOption);
-
-            $expectedClass = SentinelReplication::class;
-            $replicationClass = $replicationOption([], $options);
-
-            $this->assertInstanceOf($expectedClass, $replicationClass);
-        }
+        $this->assertInstanceOf(
+            VersionedRedisSentinelManager::class,
+            $this->manager->getVersionedManager()
+        );
     }
 
-    public function testSetsSentinelConnectionOptionsFromConfig()
+    public function testMakesARedisConnectionInstance()
     {
-        $client1 = $this->manager->connection('connection1');
-        $client2 = $this->manager->connection('connection2');
+        $this->versionedManagerMock->shouldReceive("connection")
+            ->with("connection1")
+            ->andReturn(Mockery::mock(Connection::class));
 
-        foreach ([ $client1, $client2 ] as $client) {
-            $connection = $client1->getConnection();
+        $connection = $this->manager->connection("connection1");
 
-            // Predis currently provides no way to detect these values through
-            // a pubilc interface
-            $this->assertAttributeEquals(0.99, 'sentinelTimeout', $connection);
-            $this->assertAttributeEquals(99, 'retryLimit', $connection);
-            $this->assertAttributeEquals(9999, 'retryWait', $connection);
-            $this->assertAttributeEquals(true, 'updateSentinels', $connection);
-        }
+        $this->assertInstanceOf(Connection::class, $connection);
     }
 
-    public function testCreatesSingleClientsWithSharedConfig()
+    public function testPassesMethodCallsToVersionedRedisSentinelManager()
     {
-        $client1 = $this->manager->connection('connection1');
-        $client2 = $this->manager->connection('connection2');
+        $expectedValue = "expected value";
 
-        foreach ([ $client1, $client2 ] as $client) {
-            $expected = [ 'password' => 'secret', 'database' => 0 ];
-            $parameters = $client->getOptions()->parameters;
+        // Pretend that we're executing the Redis "get" command:
+        $this->versionedManagerMock->shouldReceive("get")
+            ->with("someKey")
+            ->andReturn($expectedValue);
 
-            $this->assertEquals($expected, $parameters);
-        }
-    }
-
-    public function testCreatesSingleClientsWithIndividualConfig()
-    {
-        $client1 = $this->manager->connection('connection1');
-        $client2 = $this->manager->connection('connection2');
-
-        $this->assertEquals('mymaster', $client1->getOptions()->service);
-        $this->assertEquals('another-master', $client2->getOptions()->service);
-    }
-
-    public function testDisallowsRedisClusterConnections()
-    {
-        $this->setExpectedException(InvalidArgumentException::class);
-
-        $this->manager->connection('clustered_connection');
-    }
-
-    public function testFailsOnUndefinedConnection()
-    {
-        $this->setExpectedException(InvalidArgumentException::class);
-
-        $this->manager->connection('nonexistant_connection');
-    }
-
-    public function testFailsOnUnsupportedClientDriver()
-    {
-        $this->setExpectedException(InvalidArgumentException::class);
-
-        $manager = new RedisSentinelManager('phpredis', [
-            'test_connection' => [ ],
-        ]);
-
-        $manager->connection('test_connection');
+        $this->assertEquals($this->manager->get("someKey"), $expectedValue);
     }
 }

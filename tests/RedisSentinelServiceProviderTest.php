@@ -4,6 +4,7 @@ namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Foundation\Application;
 use Illuminate\Queue\QueueServiceProvider;
 use Illuminate\Redis\RedisManager;
@@ -67,6 +68,7 @@ class RedisSentinelServiceProviderTest extends TestCase
         $service = $this->app->make('redis-sentinel');
 
         $this->assertInstanceOf(RedisSentinelManager::class, $service);
+        $this->assertInstanceOf(RedisFactory::class, $service);
     }
 
     public function testRegisterPreservesStandardRedisApi()
