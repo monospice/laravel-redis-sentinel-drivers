@@ -10,9 +10,13 @@ php:
 env:
     - LARAVEL_VERSION=">=5.4.0 <5.4.20"
     - LARAVEL_VERSION="^5.4"
+    - LUMEN_VERSION="^5.4"
 
 before_script:
+    - if [ -n "$LARAVEL_VERSION" ]; then composer remove --dev --no-update "laravel/lumen-framework"; fi
     - if [ -n "$LARAVEL_VERSION" ]; then composer require --no-update "laravel/framework:$LARAVEL_VERSION"; fi
+    - if [ -n "$LUMEN_VERSION" ]; then composer remove --dev --no-update "laravel/framework"; fi
+    - if [ -n "$LUMEN_VERSION" ]; then composer require --no-update "laravel/lumen-framework:$LUMEN_VERSION"; fi
     - composer install --prefer-source --no-interaction
 
 script:
