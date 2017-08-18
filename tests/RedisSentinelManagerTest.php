@@ -38,6 +38,16 @@ class RedisSentinelManagerTest extends TestCase
         $this->manager = new RedisSentinelManager($this->versionedManagerMock);
     }
 
+    /**
+     * Run this cleanup after each test.
+     *
+     * @return void
+     */
+    public function tearDown()
+    {
+        Mockery::close();
+    }
+
     public function testIsInitializable()
     {
         $this->assertInstanceOf(RedisSentinelManager::class, $this->manager);

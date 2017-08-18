@@ -1,7 +1,7 @@
 {
     "name": "monospice/laravel-redis-sentinel-drivers",
-    "description": "Laravel configuration wrapper for highly-available Redis Sentinel replication.",
-    "keywords": ["redis", "sentinel", "laravel"],
+    "description": "Redis Sentinel integration for Laravel and Lumen.",
+    "keywords": ["redis", "sentinel", "laravel", "lumen"],
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -13,6 +13,7 @@
     "require": {
         "php": ">=5.6.4",
         "illuminate/cache": "^5.4",
+        "illuminate/contracts": "^5.4",
         "illuminate/queue": "^5.4",
         "illuminate/redis": "^5.4",
         "illuminate/session": "^5.4",
@@ -22,6 +23,7 @@
     },
     "require-dev": {
         "laravel/framework": "^5.4",
+        "laravel/lumen-framework": "^5.4",
         "mockery/mockery": "0.9.*",
         "phpunit/phpunit": "^4.8"
     },

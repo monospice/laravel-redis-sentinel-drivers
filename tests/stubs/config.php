@@ -67,7 +67,8 @@ return [
                 'driver' => 'redis-sentinel',
                 'connection' => 'connection1',
                 'queue' => 'default',
-                'expire' => 60,
+                'retry_after' => 90,
+                'expire' => 90, // Legacy, Laravel < 5.4.30
             ],
         ],
     ],

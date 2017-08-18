@@ -3,10 +3,10 @@
 namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Closure;
-use Illuminate\Foundation\Application;
 use Illuminate\Redis\RedisManager;
 use InvalidArgumentException;
 use Monospice\LaravelRedisSentinel\Manager;
+use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
 use Predis\Connection\Aggregate\SentinelReplication;
 
@@ -36,11 +36,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
         $config = require(__DIR__ . '/stubs/config.php');
         $config = $config['database']['redis-sentinel'];
 
-        if (version_compare(Application::VERSION, '5.4.20', 'lt')) {
-            $class = Manager\Laravel540RedisSentinelManager::class;
-        } else {
-            $class = Manager\Laravel5420RedisSentinelManager::class;
-        }
+        $class = $this->getVersionedRedisSentinelManagerClass();
 
         $this->managerClass = $class;
         $this->manager = new $class('predis', $config);
@@ -139,5 +135,29 @@ class VersionedRedisSentinelManagerTest extends TestCase
         ]);
 
         $manager->connection('test_connection');
+    }
+
+    /**
+     * Get the fully-qualified class name of the RedisSentinelManager class
+     * for the current version of Laravel or Lumen under test.
+     *
+     * @return string The class name of the appropriate RedisSentinelManager
+     * with its namespace
+     */
+    protected function getVersionedRedisSentinelManagerClass()
+    {
+        $appVersion = ApplicationFactory::getApplicationVersion();
+
+        if (ApplicationFactory::isLumen()) {
+            $frameworkVersion = '5.4';
+        } else {
+            $frameworkVersion = '5.4.20';
+        }
+
+        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
+            return Manager\Laravel540RedisSentinelManager::class;
+        }
+
+        return Manager\Laravel5420RedisSentinelManager::class;
     }
 }

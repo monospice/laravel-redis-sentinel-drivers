@@ -4,7 +4,6 @@ namespace Monospice\LaravelRedisSentinel;
 
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\RedisStore;
-use Illuminate\Foundation\Application;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Queue\Connectors\RedisConnector;
 use Illuminate\Session\CacheBasedSessionHandler;
@@ -35,18 +34,18 @@ class RedisSentinelServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->addRedisSentinelCacheDriver($this->app->make('cache'));
-        $this->addRedisSentinelSessionHandler($this->app->make('session'));
         $this->addRedisSentinelQueueConnector($this->app->make('queue'));
+
+        // Lumen removed session support since version 5.2, so we'll only bind
+        // the Sentinel session handler if we're running Laravel.
+        if (! $this->isLumenApplication()) {
+            $this->addRedisSentinelSessionHandler($this->app->make('session'));
+        }
 
         // If we want Laravel's Redis API to use Sentinel, we'll remove the
         // "redis" service from the list of deferred services in the container:
         if ($this->shouldOverrideLaravelApi()) {
-            $deferredServices = $this->app->getDeferredServices();
-
-            unset($deferredServices['redis']);
-            unset($deferredServices['redis.connection']);
-
-            $this->app->setDeferredServices($deferredServices);
+            $this->removeDeferredRedisServices();
         }
     }
 
@@ -77,7 +76,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
 
     /**
      * Replace the standard Laravel Redis service with the Redis Sentinel
-     * database driver so all redis operations use Sentinel connections.
+     * database driver so all Redis operations use Sentinel connections.
      *
      * @return void
      */
@@ -90,6 +89,26 @@ class RedisSentinelServiceProvider extends ServiceProvider
         $this->app->bind('redis.connection', function ($app) {
             return $app->make('redis-sentinel')->connection();
         });
+    }
+
+    /**
+     * Remove the standard Laravel Redis service from the bound deferred
+     * services so they don't overwrite Redis Sentinel registrations.
+     *
+     * @return void
+     */
+    protected function removeDeferredRedisServices()
+    {
+        if ($this->isLumenApplication()) {
+            return;
+        }
+
+        $deferredServices = $this->app->getDeferredServices();
+
+        unset($deferredServices['redis']);
+        unset($deferredServices['redis.connection']);
+
+        $this->app->setDeferredServices($deferredServices);
     }
 
     /**
@@ -168,17 +187,36 @@ class RedisSentinelServiceProvider extends ServiceProvider
 
     /**
      * Get the fully-qualified class name of the RedisSentinelManager class
-     * for the current version of Laravel.
+     * for the current version of Laravel or Lumen.
      *
      * @return string The class name of the appropriate RedisSentinelManager
      * with its namespace
      */
     protected function getVersionedRedisSentinelManagerClass()
     {
-        if (version_compare(Application::VERSION, '5.4.20', 'lt')) {
+        if ($this->isLumenApplication()) {
+            $appVersion = substr($this->app->version(), 7, 3);
+            $frameworkVersion = '5.4';
+        } else {
+            $appVersion = \Illuminate\Foundation\Application::VERSION;
+            $frameworkVersion = '5.4.20';
+        }
+
+        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
             return Manager\Laravel540RedisSentinelManager::class;
         }
 
         return Manager\Laravel5420RedisSentinelManager::class;
+    }
+
+    /**
+     * Determine if the current application runs the Lumen framework instead of
+     * Laravel.
+     *
+     * @return bool True if running Lumen
+     */
+    protected function isLumenApplication()
+    {
+        return $this->app instanceof \Laravel\Lumen\Application;
     }
 }
