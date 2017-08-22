@@ -48,6 +48,29 @@ class RedisSentinelServiceProviderTest extends TestCase
         );
     }
 
+    public function testLoadsDefaultConfiguration()
+    {
+        $config = new ConfigRepository();
+        $this->app->config = $config;
+
+        // The package only sets "session.connection" when "session.driver"
+        // equals "redis-sentinel"
+        if (! ApplicationFactory::isLumen()) {
+            $config->set('session.driver', 'redis-sentinel');
+        }
+
+        $this->provider->register();
+
+        $this->assertTrue($config->has('database.redis-sentinel'));
+        $this->assertTrue($config->has('database.redis.driver'));
+        $this->assertTrue($config->has('cache.stores.redis-sentinel'));
+        $this->assertTrue($config->has('queue.connections.redis-sentinel'));
+
+        if (! ApplicationFactory::isLumen()) {
+            $this->assertTrue($config->has('session.connection'));
+        }
+    }
+
     public function testRegistersWithApplication()
     {
         $this->provider->register();
@@ -72,7 +95,7 @@ class RedisSentinelServiceProviderTest extends TestCase
 
     public function testRegisterOverridesStandardRedisApi()
     {
-        $this->app->config->set('database.redis.driver', 'sentinel');
+        $this->app->config->set('database.redis.driver', 'redis-sentinel');
         $this->provider->register();
         $this->provider->boot();
 

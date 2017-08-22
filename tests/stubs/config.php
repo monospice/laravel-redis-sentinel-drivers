@@ -10,19 +10,19 @@ return [
     // Represents a subset of config/database.php
     'database' => [
         'redis' => [
-            'driver' => 'sentinel',
+            'driver' => 'redis-sentinel',
         ],
         'redis-sentinel' => [
             'connection1' => [
                 [
                     'host' => 'localhost',
-                    'port' => 6379,
+                    'port' => 26379,
                 ],
             ],
             'connection2' => [
                 [
                     'host' => 'localhost',
-                    'port' => 6379,
+                    'port' => 26379,
                 ],
                 'options' => [
                     'service' => 'another-master',

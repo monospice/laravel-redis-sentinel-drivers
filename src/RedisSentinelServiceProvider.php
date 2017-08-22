@@ -10,6 +10,7 @@ use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
+use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Monospice\LaravelRedisSentinel\Manager;
 
@@ -21,10 +22,17 @@ use Monospice\LaravelRedisSentinel\Manager;
  * @package  Monospice\LaravelRedisSentinel
  * @author   Cy Rossignol <cy@rossignols.me>
  * @license  See LICENSE file
- * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
+ * @link     https://github.com/monospice/laravel-redis-sentinel-drivers
  */
 class RedisSentinelServiceProvider extends ServiceProvider
 {
+    /**
+     * Loads the package's configuration and provides configuration values.
+     *
+     * @var ConfigurationLoader
+     */
+    protected $config;
+
     /**
      * Boot the service by registering extensions with Laravel's cache, queue,
      * and session managers for the "redis-sentinel" driver.
@@ -36,15 +44,15 @@ class RedisSentinelServiceProvider extends ServiceProvider
         $this->addRedisSentinelCacheDriver($this->app->make('cache'));
         $this->addRedisSentinelQueueConnector($this->app->make('queue'));
 
-        // Lumen removed session support since version 5.2, so we'll only bind
-        // the Sentinel session handler if we're running Laravel.
-        if (! $this->isLumenApplication()) {
+        // Since version 5.2, Lumen does not include support for sessions by
+        // default, so we'll only register the session handler if enabled:
+        if ($this->config->supportsSessions) {
             $this->addRedisSentinelSessionHandler($this->app->make('session'));
         }
 
         // If we want Laravel's Redis API to use Sentinel, we'll remove the
-        // "redis" service from the list of deferred services in the container:
-        if ($this->shouldOverrideLaravelApi()) {
+        // "redis" service from the deferred services in the container:
+        if ($this->config->shouldOverrideLaravelRedisApi()) {
             $this->removeDeferredRedisServices();
         }
     }
@@ -57,10 +65,11 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        $class = $this->getVersionedRedisSentinelManagerClass();
+        $this->config = ConfigurationLoader::load($this->app);
 
-        $this->app->singleton('redis-sentinel', function ($app) use ($class) {
-            $config = $app->make('config')->get('database.redis-sentinel');
+        $this->app->singleton('redis-sentinel', function ($app) {
+            $class = $this->getVersionedRedisSentinelManagerClass();
+            $config = $app->make('config')->get('database.redis-sentinel', [ ]);
             $driver = Arr::pull($config, 'client', 'predis');
 
             return new RedisSentinelManager(new $class($driver, $config));
@@ -69,7 +78,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
         // If we want Laravel's Redis API to use Sentinel, we'll return an
         // instance of the RedisSentinelManager when requesting the "redis"
         // service:
-        if ($this->shouldOverrideLaravelApi()) {
+        if ($this->config->shouldOverrideLaravelRedisApi()) {
             $this->registerOverrides();
         }
     }
@@ -99,7 +108,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     protected function removeDeferredRedisServices()
     {
-        if ($this->isLumenApplication()) {
+        if ($this->config->isLumen) {
             return;
         }
 
@@ -143,7 +152,6 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $session->extend('redis-sentinel', function ($app) {
             $config = $app->make('config');
-
             $cacheDriver = clone $app->make('cache')->driver('redis-sentinel');
             $minutes = $config->get('session.lifetime');
             $connection = $config->get('session.connection');
@@ -172,20 +180,6 @@ class RedisSentinelServiceProvider extends ServiceProvider
     }
 
     /**
-     * Determine whether this package should replace Laravel's Redis API
-     * ("Redis" facade and "redis" service binding).
-     *
-     * @return bool True if "database.redis.driver" configuration option is
-     * set to "sentinel"
-     */
-    protected function shouldOverrideLaravelApi()
-    {
-        $driver = $this->app->make('config')->get('database.redis.driver');
-
-        return $driver === 'sentinel';
-    }
-
-    /**
      * Get the fully-qualified class name of the RedisSentinelManager class
      * for the current version of Laravel or Lumen.
      *
@@ -194,8 +188,8 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     protected function getVersionedRedisSentinelManagerClass()
     {
-        if ($this->isLumenApplication()) {
-            $appVersion = substr($this->app->version(), 7, 3);
+        if ($this->config->isLumen) {
+            $appVersion = substr($this->app->version(), 7, 3); // ex. "5.4"
             $frameworkVersion = '5.4';
         } else {
             $appVersion = \Illuminate\Foundation\Application::VERSION;
@@ -207,16 +201,5 @@ class RedisSentinelServiceProvider extends ServiceProvider
         }
 
         return Manager\Laravel5420RedisSentinelManager::class;
-    }
-
-    /**
-     * Determine if the current application runs the Lumen framework instead of
-     * Laravel.
-     *
-     * @return bool True if running Lumen
-     */
-    protected function isLumenApplication()
-    {
-        return $this->app instanceof \Laravel\Lumen\Application;
     }
 }
