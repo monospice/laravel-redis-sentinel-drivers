@@ -10,6 +10,7 @@ use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
+use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
 use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
 
 /**
@@ -20,10 +21,17 @@ use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
  * @package  Monospice\LaravelRedisSentinel
  * @author   Cy Rossignol <cy@rossignols.me>
  * @license  See LICENSE file
- * @link     http://github.com/monospice/laravel-redis-sentinel-driver
+ * @link     https://github.com/monospice/laravel-redis-sentinel-drivers
  */
 class RedisSentinelServiceProvider extends ServiceProvider
 {
+    /**
+     * Loads the package's configuration and provides configuration values.
+     *
+     * @var ConfigurationLoader
+     */
+    protected $config;
+
     /**
      * Boot the service by registering extensions with Laravel's cache, queue,
      * and session managers for the "redis-sentinel" driver.
@@ -33,16 +41,18 @@ class RedisSentinelServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->addRedisSentinelCacheDriver($this->app->make('cache'));
-        $this->addRedisSentinelSessionHandler($this->app->make('session'));
         $this->addRedisSentinelQueueConnector($this->app->make('queue'));
 
-        // If we want Laravel's Redis API to use Sentinel, we'll remove the
-        // "redis" service from the list of deferred services in the container:
-        if ($this->shouldOverrideLaravelApi()) {
-            $deferredServices = $this->app->getDeferredServices();
-            unset($deferredServices['redis']);
+        // Since version 5.2, Lumen does not include support for sessions by
+        // default, so we'll only register the session handler if enabled:
+        if ($this->config->supportsSessions) {
+            $this->addRedisSentinelSessionHandler($this->app->make('session'));
+        }
 
-            $this->app->setDeferredServices($deferredServices);
+        // If we want Laravel's Redis API to use Sentinel, we'll remove the
+        // "redis" service from the deferred services in the container:
+        if ($this->config->shouldOverrideLaravelRedisApi()) {
+            $this->removeDeferredRedisServices();
         }
     }
 
@@ -54,8 +64,10 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        $this->config = ConfigurationLoader::load($this->app);
+
         $this->app->singleton('redis-sentinel', function ($app) {
-            $config = $app->make('config')->get('database.redis-sentinel');
+            $config = $app->make('config')->get('database.redis-sentinel', [ ]);
 
             return new RedisSentinelDatabase($config);
         });
@@ -63,11 +75,43 @@ class RedisSentinelServiceProvider extends ServiceProvider
         // If we want Laravel's Redis API to use Sentinel, we'll return an
         // instance of the RedisSentinelDatabase when requesting the "redis"
         // service:
-        if ($this->shouldOverrideLaravelApi()) {
-            $this->app->singleton('redis', function ($app) {
-                return $app->make('redis-sentinel');
-            });
+        if ($this->config->shouldOverrideLaravelRedisApi()) {
+            $this->registerOverrides();
         }
+    }
+
+    /**
+     * Replace the standard Laravel Redis service with the Redis Sentinel
+     * database driver so all Redis operations use Sentinel connections.
+     *
+     * @return void
+     */
+    protected function registerOverrides()
+    {
+        $this->app->singleton('redis', function ($app) {
+            return $app->make('redis-sentinel');
+        });
+    }
+
+    /**
+     * Remove the standard Laravel Redis service from the bound deferred
+     * services so they don't overwrite Redis Sentinel registrations.
+     *
+     * @return void
+     */
+    protected function removeDeferredRedisServices()
+    {
+        if ($this->config->isLumen) {
+            unset($this->app->availableBindings['redis']);
+
+            return;
+        }
+
+        $deferredServices = $this->app->getDeferredServices();
+
+        unset($deferredServices['redis']);
+
+        $this->app->setDeferredServices($deferredServices);
     }
 
     /**
@@ -81,7 +125,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
     protected function addRedisSentinelCacheDriver(CacheManager $cache)
     {
         $cache->extend('redis-sentinel', function ($app, $conf) use ($cache) {
-            $redis = $app['redis-sentinel'];
+            $redis = $app->make('redis-sentinel');
             $prefix = $app->make('config')->get('cache.prefix');
             $connection = Arr::get($conf, 'connection', 'default');
             $store = new RedisStore($redis, $prefix, $connection);
@@ -102,7 +146,6 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $session->extend('redis-sentinel', function ($app) {
             $config = $app->make('config');
-
             $cacheDriver = clone $app->make('cache')->driver('redis-sentinel');
             $minutes = $config->get('session.lifetime');
             $connection = $config->get('session.connection');
@@ -123,24 +166,10 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     protected function addRedisSentinelQueueConnector(QueueManager $queue)
     {
-        $app = $this->app;
+        $queue->extend('redis-sentinel', function () {
+            $redis = $this->app->make('redis-sentinel');
 
-        $queue->extend('redis-sentinel', function () use ($app) {
-            return new RedisConnector($app->make('redis-sentinel'));
+            return new RedisConnector($redis);
         });
-    }
-
-    /**
-     * Determine this package should replace Laravel's Redis API ("Redis"
-     * facade and "redis" service binding)
-     *
-     * @return bool True if "database.redis.driver" configuration option is
-     * set to "sentinel"
-     */
-    protected function shouldOverrideLaravelApi()
-    {
-        $driver = $this->app->make('config')->get('database.redis.driver');
-
-        return $driver === 'sentinel';
     }
 }

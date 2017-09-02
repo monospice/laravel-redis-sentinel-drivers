@@ -5,15 +5,26 @@ namespace Monospice\LaravelRedisSentinel\Tests;
 use Mockery;
 use Monospice\LaravelRedisSentinel\RedisSentinel;
 use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
+use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
 
 class RedisSentinelFacadeTest extends TestCase
 {
+    /**
+     * Run this cleanup after each test.
+     *
+     * @return void
+     */
+    public function tearDown()
+    {
+        Mockery::close();
+    }
+
     public function testResolvesFacadeServiceFromContainer()
     {
         $service = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
+        $app = ApplicationFactory::make();
 
-        $app = new \Illuminate\Foundation\Application();
         $app->singleton('redis-sentinel', function () use ($service) {
             return Mockery::mock($service);
         });
