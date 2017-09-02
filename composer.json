@@ -36,5 +36,15 @@
         "psr-4": {
             "Monospice\\LaravelRedisSentinel\\Tests\\": "tests/"
         }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Monospice\\LaravelRedisSentinel\\RedisSentinelServiceProvider"
+            ],
+            "aliases": {
+                "RedisSentinel": "Monospice\\LaravelRedisSentinel\\RedisSentinel"
+            }
+        }
     }
 }

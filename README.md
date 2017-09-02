@@ -83,8 +83,11 @@ If the project does not already use Redis with Laravel, this will install the
 
 #### Register the Service Provider
 
-To use the drivers in Laravel, add the package's service provider to
-*config/app.php*:
+Laravel 5.5 brings [package discovery][laravel-package-discovery-docs]! *No
+additional registration required in Laravel 5.5+.*
+
+To use the drivers in Laravel 5.4 and below, add the package's service provider
+to *config/app.php*:
 
 ```php
 'providers' => [
@@ -567,11 +570,13 @@ app('redis')->get('some-key');
 This provides support for uncommon use cases for which an application may need
 to connect to both standard Redis servers and Sentinel clusters in the same
 environment. When possible, follow the approach described in the previous
-section to uniformly connect to Sentinel throughout application to decouple the
-code from the Redis implementation.
+section to uniformly connect to Sentinel throughout the application to decouple
+the code from the Redis implementation.
 
-To enable the facade in Laravel, add the following alias to the `'aliases'`
-array in *config/app.php*:
+The facade is automatically aliased in Laravel 5.5+ through the framework's
+[package discovery][laravel-package-discovery-docs]. To enable the facade in
+Laravel 5.4 and below, add the following alias to the `'aliases'` array in
+*config/app.php*:
 
 ```php
 'aliases' => [
@@ -943,6 +948,7 @@ Sentinel Documentation][sentinel].
 [s-standard-config-examples]: #configuration-file-examples
 
 [laravel-env-docs]: https://laravel.com/docs/configuration#environment-configuration
+[laravel-package-discovery-docs]: https://laravel.com/docs/packages#package-discovery
 [laravel-redis-api-docs]: https://laravel.com/docs/redis#interacting-with-redis
 [laravel-redis-docs]: https://laravel.com/docs/redis
 [laravel]: https://laravel.com
