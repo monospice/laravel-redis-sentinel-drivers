@@ -95,10 +95,11 @@ return [
     | array that defines options for all connections.
     |
     | We can individually configure each of the application service connections
-    | ("cache", "session", and "queue") with environment variables by setting
-    | the variables named for each connection. If more than one connection
-    | shares a common configuration value, we can instead set the environment
-    | variable that applies to all of the Sentinel connections.
+    | ("broadcasting", "cache", "session", and "queue") with environment
+    | variables by setting the variables named for each connection. If more
+    | than one connection shares a common configuration value, we can instead
+    | set the environment variable that applies to all of the Sentinel
+    | connections.
     |
     | For example, we may set the following configuration in ".env" for a setup
     | that uses the same Sentinel hosts for the application's cache and queue,
@@ -142,6 +143,20 @@ return [
                 [
                     'host' => $host,
                     'port' => $port,
+                ],
+            ],
+
+            'broadcasting' => [
+                [
+                    'host' => env('REDIS_BROADCAST_HOST', $host),
+                    'port' => env('REDIS_BROADCAST_PORT', $port),
+                ],
+                'options' => [
+                    'service' => env('REDIS_BROADCAST_SERVICE', $service),
+                    'parameters' => [
+                        'password' => env('REDIS_BROADCAST_PASSWORD', $password),
+                        'database' => env('REDIS_BROADCAST_DATABASE', $database),
+                    ],
                 ],
             ],
 
@@ -214,6 +229,28 @@ return [
             'driver' => env('REDIS_DRIVER', 'default'),
         ],
 
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Redis Sentinel Broadcasting Connection
+    |--------------------------------------------------------------------------
+    |
+    | Defines the broadcasting connection that uses a Redis Sentinel connection
+    | for the application event broadcasting services.
+    |
+    */
+
+    'broadcasting' => [
+        'connections' => [
+            'redis-sentinel' => [
+                'driver' => 'redis-sentinel',
+                'connection' => env(
+                    'BROADCAST_REDIS_SENTINEL_CONNECTION',
+                    env('BROADCAST_REDIS_CONNECTION', 'broadcasting')
+                ),
+            ],
+        ],
     ],
 
     /*

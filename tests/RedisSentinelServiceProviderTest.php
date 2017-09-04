@@ -3,6 +3,7 @@
 namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Illuminate\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\RedisManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
@@ -50,6 +51,14 @@ class RedisSentinelServiceProviderTest extends TestCase
 
     public function testLoadsDefaultConfiguration()
     {
+        $expectedConfigKeys = [
+            'database.redis-sentinel',
+            'database.redis.driver',
+            'broadcasting.connections.redis-sentinel',
+            'cache.stores.redis-sentinel',
+            'queue.connections.redis-sentinel',
+        ];
+
         $config = new ConfigRepository();
         $this->app->config = $config;
 
@@ -57,17 +66,13 @@ class RedisSentinelServiceProviderTest extends TestCase
         // equals "redis-sentinel"
         if (! ApplicationFactory::isLumen()) {
             $config->set('session.driver', 'redis-sentinel');
+            $expectedConfigKeys[] = 'session.connection';
         }
 
         $this->provider->register();
 
-        $this->assertTrue($config->has('database.redis-sentinel'));
-        $this->assertTrue($config->has('database.redis.driver'));
-        $this->assertTrue($config->has('cache.stores.redis-sentinel'));
-        $this->assertTrue($config->has('queue.connections.redis-sentinel'));
-
-        if (! ApplicationFactory::isLumen()) {
-            $this->assertTrue($config->has('session.connection'));
+        foreach ($expectedConfigKeys as $configKey) {
+            $this->assertTrue($config->has($configKey), $configKey);
         }
     }
 
@@ -102,6 +107,16 @@ class RedisSentinelServiceProviderTest extends TestCase
         $redisService = $this->app->make('redis');
 
         $this->assertInstanceOf(RedisSentinelManager::class, $redisService);
+    }
+
+    public function testBootExtendsBroadcastConnections()
+    {
+        $this->provider->register();
+        $this->provider->boot();
+
+        $broadcast = $this->app->make(BroadcastFactory::class);
+
+        $this->assertNotNull($broadcast->connection('redis-sentinel'));
     }
 
     public function testBootExtendsCacheStores()

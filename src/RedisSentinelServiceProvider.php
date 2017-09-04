@@ -2,12 +2,11 @@
 
 namespace Monospice\LaravelRedisSentinel;
 
-use Illuminate\Cache\CacheManager;
+use Illuminate\Broadcasting\Broadcasters\RedisBroadcaster;
+use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Cache\RedisStore;
-use Illuminate\Queue\QueueManager;
 use Illuminate\Queue\Connectors\RedisConnector;
 use Illuminate\Session\CacheBasedSessionHandler;
-use Illuminate\Session\SessionManager;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
@@ -41,14 +40,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->addRedisSentinelCacheDriver($this->app->make('cache'));
-        $this->addRedisSentinelQueueConnector($this->app->make('queue'));
-
-        // Since version 5.2, Lumen does not include support for sessions by
-        // default, so we'll only register the session handler if enabled:
-        if ($this->config->supportsSessions) {
-            $this->addRedisSentinelSessionHandler($this->app->make('session'));
-        }
+        $this->bootComponentDrivers();
 
         // If we want Laravel's Redis API to use Sentinel, we'll remove the
         // "redis" service from the deferred services in the container:
@@ -101,6 +93,25 @@ class RedisSentinelServiceProvider extends ServiceProvider
     }
 
     /**
+     * Extend each of the Laravel services this package supports with the
+     * corresponding 'redis-sentinel' driver.
+     *
+     * @return void
+     */
+    protected function bootComponentDrivers()
+    {
+        $this->addRedisSentinelBroadcaster();
+        $this->addRedisSentinelCacheStore();
+        $this->addRedisSentinelQueueConnector();
+
+        // Since version 5.2, Lumen does not include support for sessions by
+        // default, so we'll only register the session handler if enabled:
+        if ($this->config->supportsSessions) {
+            $this->addRedisSentinelSessionHandler();
+        }
+    }
+
+    /**
      * Remove the standard Laravel Redis service from the bound deferred
      * services so they don't overwrite Redis Sentinel registrations.
      *
@@ -121,15 +132,32 @@ class RedisSentinelServiceProvider extends ServiceProvider
     }
 
     /**
-     * Add "redis-sentinel" as an available driver option to the Laravel cache
-     * manager.
-     *
-     * @param CacheManager $cache The Laravel cache manager
+     * Add "redis-sentinel" as an available broadcaster option to the Laravel
+     * event broadcasting manager.
      *
      * @return void
      */
-    protected function addRedisSentinelCacheDriver(CacheManager $cache)
+    protected function addRedisSentinelBroadcaster()
     {
+        $this->app->make(BroadcastFactory::class)
+            ->extend('redis-sentinel', function ($app, $conf) {
+                $redis = $app->make('redis-sentinel')->getVersionedManager();
+                $connection = Arr::get($conf, 'connection', 'default');
+
+                return new RedisBroadcaster($redis, $connection);
+            });
+    }
+
+    /**
+     * Add "redis-sentinel" as an available cache store option to the Laravel
+     * cache manager.
+     *
+     * @return void
+     */
+    protected function addRedisSentinelCacheStore()
+    {
+        $cache = $this->app->make('cache');
+
         $cache->extend('redis-sentinel', function ($app, $conf) use ($cache) {
             $redis = $app->make('redis-sentinel')->getVersionedManager();
             $prefix = $app->make('config')->get('cache.prefix');
@@ -144,13 +172,11 @@ class RedisSentinelServiceProvider extends ServiceProvider
      * Add "redis-sentinel" as an available driver option to the Laravel
      * session manager.
      *
-     * @param SessionManager $session The Laravel session manager
-     *
      * @return void
      */
-    protected function addRedisSentinelSessionHandler(SessionManager $session)
+    protected function addRedisSentinelSessionHandler()
     {
-        $session->extend('redis-sentinel', function ($app) {
+        $this->app->make('session')->extend('redis-sentinel', function ($app) {
             $config = $app->make('config');
             $cacheDriver = clone $app->make('cache')->driver('redis-sentinel');
             $minutes = $config->get('session.lifetime');
@@ -166,13 +192,11 @@ class RedisSentinelServiceProvider extends ServiceProvider
      * Add "redis-sentinel" as an available queue connection driver option to
      * the Laravel queue manager.
      *
-     * @param QueueManager $queue The Laravel queue manager
-     *
      * @return void
      */
-    protected function addRedisSentinelQueueConnector(QueueManager $queue)
+    protected function addRedisSentinelQueueConnector()
     {
-        $queue->extend('redis-sentinel', function () {
+        $this->app->make('queue')->extend('redis-sentinel', function () {
             $redis = $this->app->make('redis-sentinel')->getVersionedManager();
 
             return new RedisConnector($redis);

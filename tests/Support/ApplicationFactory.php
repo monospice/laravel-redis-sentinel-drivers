@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests\Support;
 
+use Illuminate\Broadcasting\BroadcastServiceProvider;
 use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Queue\QueueServiceProvider;
@@ -36,7 +37,7 @@ class ApplicationFactory
     public static function getApplicationVersion()
     {
         if (static::isLumen()) {
-            return substr(static::makeLumenApplication()->version(), 7, 3);
+            return substr(static::makeLumenApplication(false)->version(), 7, 3);
         }
 
         return \Illuminate\Foundation\Application::VERSION;
@@ -54,6 +55,8 @@ class ApplicationFactory
     public static function makeLaravelApplication($configure = true)
     {
         $app = new \Illuminate\Foundation\Application();
+
+        $app->register(new BroadcastServiceProvider($app));
         $app->register(new CacheServiceProvider($app));
         $app->register(new QueueServiceProvider($app));
         $app->register(new SessionServiceProvider($app));
@@ -82,6 +85,7 @@ class ApplicationFactory
         if ($configure) {
             $app->register(RedisServiceProvider::class);
             $app->configure('database');
+            $app->configure('broadcasting');
             $app->configure('cache');
             $app->configure('queue');
         }

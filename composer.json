@@ -41,10 +41,7 @@
         "laravel": {
             "providers": [
                 "Monospice\\LaravelRedisSentinel\\RedisSentinelServiceProvider"
-            ],
-            "aliases": {
-                "RedisSentinel": "Monospice\\LaravelRedisSentinel\\RedisSentinel"
-            }
+            ]
         }
     }
 }

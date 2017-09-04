@@ -210,6 +210,7 @@ class Loader
     protected function configureLumenComponents()
     {
         $this->app->configure('database');
+        $this->app->configure('broadcasting');
         $this->app->configure('cache');
         $this->app->configure('queue');
     }
@@ -224,6 +225,7 @@ class Loader
     {
         $this->setConfigurationFor('database.redis-sentinel');
         $this->setConfigurationFor('database.redis.driver');
+        $this->setConfigurationFor('broadcasting.connections.redis-sentinel');
         $this->setConfigurationFor('cache.stores.redis-sentinel');
         $this->setConfigurationFor('queue.connections.redis-sentinel');
         $this->setSessionConfiguration();
