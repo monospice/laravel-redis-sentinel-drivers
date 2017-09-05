@@ -14,7 +14,7 @@ class RedisSentinelServiceProviderTest extends TestCase
     /**
      * An instance of the Laravel application container
      *
-     * @var Application
+     * @var \Illuminate\Contracts\Container\Container
      */
     protected $app;
 
@@ -48,6 +48,13 @@ class RedisSentinelServiceProviderTest extends TestCase
 
     public function testLoadsDefaultConfiguration()
     {
+        $expectedConfigKeys = [
+            'database.redis-sentinel',
+            'database.redis.driver',
+            'cache.stores.redis-sentinel',
+            'queue.connections.redis-sentinel',
+        ];
+
         $config = new ConfigRepository();
         $this->app->config = $config;
 
@@ -55,17 +62,17 @@ class RedisSentinelServiceProviderTest extends TestCase
         // equals "redis-sentinel"
         if (! ApplicationFactory::isLumen()) {
             $config->set('session.driver', 'redis-sentinel');
+            $expectedConfigKeys[] = 'session.connection';
+        }
+
+        if (ApplicationFactory::supportsBroadcasting()) {
+            $expectedConfigKeys[] = 'broadcasting.connections.redis-sentinel';
         }
 
         $this->provider->register();
 
-        $this->assertTrue($config->has('database.redis-sentinel'));
-        $this->assertTrue($config->has('database.redis.driver'));
-        $this->assertTrue($config->has('cache.stores.redis-sentinel'));
-        $this->assertTrue($config->has('queue.connections.redis-sentinel'));
-
-        if (! ApplicationFactory::isLumen()) {
-            $this->assertTrue($config->has('session.connection'));
+        foreach ($expectedConfigKeys as $configKey) {
+            $this->assertTrue($config->has($configKey), $configKey);
         }
     }
 
@@ -104,6 +111,22 @@ class RedisSentinelServiceProviderTest extends TestCase
         $class = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
 
         $this->assertInstanceOf($class, $redisService);
+    }
+
+    public function testBootExtendsBroadcastConnections()
+    {
+        $this->provider->register();
+        $this->provider->boot();
+
+        $managerClass = 'Illuminate\Contracts\Broadcasting\Factory';
+
+        if (ApplicationFactory::supportsBroadcasting()) {
+            $broadcast = $this->app->make($managerClass);
+
+            $this->assertNotNull($broadcast->connection('redis-sentinel'));
+        } else {
+            $this->assertFalse($this->app->bound($managerClass));
+        }
     }
 
     public function testBootExtendsCacheStores()

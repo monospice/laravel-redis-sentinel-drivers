@@ -69,6 +69,13 @@ class Loader
     public $isLumen;
 
     /**
+     * Indicates whether the current application supports broadcasting.
+     *
+     * @var bool
+     */
+    public $supportsBroadcasting;
+
+    /**
      * Indicates whether the current application supports sessions.
      *
      * @var bool
@@ -114,8 +121,10 @@ class Loader
         $this->config = $app->make('config');
 
         $lumenApplicationClass = 'Laravel\Lumen\Application';
+        $broadcastManagerClass = 'Illuminate\Broadcasting\BroadcastManager';
 
         $this->isLumen = $app instanceof $lumenApplicationClass;
+        $this->supportsBroadcasting = class_exists($broadcastManagerClass);
         $this->supportsSessions = $app->bound('session');
     }
 
@@ -205,6 +214,10 @@ class Loader
         $this->app->configure('database');
         $this->app->configure('cache');
         $this->app->configure('queue');
+
+        if ($this->supportsBroadcasting) {
+            $this->app->configure('broadcasting');
+        }
     }
 
     /**
@@ -220,6 +233,10 @@ class Loader
         $this->setConfigurationFor('cache.stores.redis-sentinel');
         $this->setConfigurationFor('queue.connections.redis-sentinel');
         $this->setSessionConfiguration();
+
+        if ($this->supportsBroadcasting) {
+            $this->setConfigurationFor('broadcasting.connections.redis-sentinel');
+        }
 
         $this->normalizeHosts();
 

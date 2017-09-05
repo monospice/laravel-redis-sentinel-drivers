@@ -6,7 +6,7 @@ Laravel Drivers for Redis Sentinel
 
 #### Redis Sentinel integration for Laravel and Lumen.
 
-[Redis Sentinel][sentinel] provides high-availability, monitoring, and
+[Redis Sentinel][sentinel] facilitates high-availability, monitoring, and
 load-balancing for Redis servers configured for master-slave replication.
 [Laravel][laravel] includes built-in support for Redis, but we cannot configure
 Sentinel setups flexibly out-of-the-box. This limits configuration of Sentinel
@@ -18,13 +18,13 @@ types of data like we can in a standard, single-server Redis setup without
 Sentinel. This causes issues when we need to clear the cache, because Laravel
 erases stored session information as well.
 
-This package wraps the configuration of Laravel's caching, session, and queue
-APIs for Sentinel with the ability to set options for our Redis services
-independently. We configure the package separately from Laravel's standard
-Redis configuration so we can choose to use the Sentinel connections as needed
-by the environment. A developer may use a standalone Redis server in their
-local environment, while production environments operate a Redis Sentinel set
-of servers.
+This package wraps the configuration of Laravel's broadcasting, cache, session,
+and queue APIs for Sentinel with the ability to set options for our Redis
+services independently. We configure the package separately from Laravel's
+standard Redis configuration so we can choose to use the Sentinel connections
+as needed by the environment. A developer may use a standalone Redis server in
+their local environment, while production environments operate a Redis Sentinel
+set of servers.
 
 Contents
 --------
@@ -78,13 +78,21 @@ composer require monospice/laravel-redis-sentinel-drivers
 composer require monospice/laravel-redis-sentinel-drivers:^1.0
 ```
 
+**Note:** According to the Laravel release schedule, all Laravel versions prior
+to 5.4 exited their active development and support periods in August of 2017.
+After December, 2017, this package will no longer provide feature releases on
+the `1.x` branch for Laravel versions earlier than 5.4.
+
 If the project does not already use Redis with Laravel, this will install the
 [Predis][predis] package as well.
 
 #### Register the Service Provider
 
-To use the drivers in Laravel, add the package's service provider to
-*config/app.php*:
+Laravel 5.5 brings [package discovery][laravel-package-discovery-docs]! *No
+service provider registration required in Laravel 5.5+.*
+
+To use the drivers in Laravel 5.4 and below, add the package's service provider
+to *config/app.php*:
 
 ```php
 'providers' => [
@@ -162,8 +170,8 @@ Environment-Based Configuration
 For suitable applications, the package's ability to configure itself from the
 environment eliminates the need to create or modify configuration files in many
 scenarios. The package automatically configures Redis Sentinel connections and
-the application cache, session, and queue services for these connections using
-environment variables.
+the application broadcasting, cache, session, and queue services for these
+connections using environment variables.
 
 Developers may still configure the package [through standard Laravel
 configuration files][s-standard-config] when the application requirements
@@ -184,10 +192,11 @@ This sets up the *default* Redis Sentinel connection for the package's services
 that we can access through the [`RedisSentinel` facade][s-facade] (or by
 resolving `app('redis-sentinel')` from the container) like we would for
 Laravel's [standard Redis API][laravel-redis-api-docs]. To use this Sentinel
-connection for Laravel's cache, session, or queue services, change the
-following values as well:
+connection for Laravel's broadcasting, cache, session, or queue services,
+change the following values as well:
 
 ```shell
+BROADCAST_DRIVER=redis-sentinel
 CACHE_DRIVER=redis-sentinel
 SESSION_DRIVER=redis-sentinel
 QUEUE_DRIVER=redis-sentinel
@@ -196,10 +205,11 @@ QUEUE_DRIVER=redis-sentinel
 #### Connection-Specific Configuration
 
 In many cases, we'd set different connection parameters for the application
-cache, session, and queue. We may configure different Redis databases for our
-cache and session (so that clearing the cache doesn't erase our user session
-information), and the Redis servers that contain the application queue may
-reside behind a different Sentinel service (master group name):
+broadcasts, cache, session, and queue. We may configure different Redis
+databases for our cache and session (so that clearing the cache doesn't erase
+our user session information), and the Redis servers that contain the
+application queue may reside behind a different Sentinel service (master group
+name):
 
 ```shell
 REDIS_CACHE_DATABASE=1
@@ -214,9 +224,9 @@ the value of any `*_HOST` variable to a comma-seperated string of hostnames or
 IP addresses:
 
 ```shell
-REDIS_HOST=sentinel1.example.com, sentinel2.example.com
+REDIS_HOST=sentinel1.example.com, sentinel2.example.com, ...
 REDIS_CACHE_HOST=10.0.0.1, 10.0.0.2, 10.0.0.3
-REDIS_QUEUE_HOST=tcp://10.0.0.4:26379, tcp://10.0.0.4:26380
+REDIS_QUEUE_HOST=tcp://10.0.0.4:26379, tcp://10.0.0.4:26380, ...
 ```
 
 Hosts share the port set for the connection unless we explicitly include the
@@ -378,14 +388,41 @@ for a single connection. The default values are shown below:
 ],
 ```
 
-### Cache, Session, and Queue Drivers
+### Broadcasting, Cache, Session, and Queue Drivers
 
 After configuring the Sentinel database connections, we can instruct Laravel to
-use these connections for the application's cache, session, and queue services.
+use these connections for the application's other redis-enabled services.
 Remember that we don't need to set Sentinel connections for all of these
 services. We could select a standard Redis connection for one and a Sentinel
 connection for another, if desired, but we likely want to take advantage of
 Sentinel for all of our Redis connections if it's available.
+
+**Note:** We can omit (or remove) the following configuration blocks entirely
+and the package will configure these services for us. If we created custom
+Sentinel connections as above, we may need to [declare those connection
+names](#broadcast_redis_connection-broadcast_redis_sentinel_connection).
+
+#### Broadcasting
+
+Add the following connection definition to *config/broadcasting.php* in the
+`'connections'` array:
+
+```php
+'connections' => [
+    ...
+    'redis-sentinel' => [
+        'driver' => 'redis-sentinel',
+        'connection' => 'default',
+    ],
+],
+```
+
+...and change the `BROADCAST_DRIVER` environment variable to `redis-sentinel`
+in *.env*.
+
+If the application contains a specific connection in the `'redis-sentinel'`
+database configuration for the event broadcasting, replace `'default'` with its
+name.
 
 #### Cache
 
@@ -474,8 +511,8 @@ as needed. Lumen users may need to create this directory if it doesn't exist.
 A custom package config file need only contain the top-level elements that
 developer wishes to customize: in the code shown above, the custom config file
 only overrides the package's default configuration for Redis Sentinel
-connections, so the package will still automatically configure the cache,
-session, and queue services using environment variables.
+connections, so the package will still automatically configure the broadcasting,
+cache, session, and queue services using environment variables.
 
 Hybrid Configuration
 --------------------
@@ -485,7 +522,7 @@ configuration methods provided by this package. For example, an application may
 contain a [standard][s-standard-config] or [package][s-package-config] config
 file that defines the Redis Sentinel connections, but rely on the package's
 automatic [environment-based configuration][s-env-config] to set up the cache,
-session, and queue services for Sentinel.
+session, queue, and broadcasting services for Sentinel.
 
 The package uses configuration data in this order of precedence:
 
@@ -548,7 +585,7 @@ local environments and switch to a full Sentinel set of servers in production.
 Executing Redis Commands (RedisSentinel Facade)
 -------------------------------------------------
 
-If a we need to send Redis commands to Redis instances behind a Sentinel server
+If we need to send Redis commands to Redis instances behind a Sentinel server
 directly, such as we can through the `Redis` facade, but we don't want to
 [override Laravel's Redis API][s-override-redis-api] as above, we can use the
 `RedisSentinel` facade provided by this package or resolve the `redis-sentinel`
@@ -567,11 +604,12 @@ app('redis')->get('some-key');
 This provides support for uncommon use cases for which an application may need
 to connect to both standard Redis servers and Sentinel clusters in the same
 environment. When possible, follow the approach described in the previous
-section to uniformly connect to Sentinel throughout application to decouple the
-code from the Redis implementation.
+section to uniformly connect to Sentinel throughout the application to decouple
+the code from the Redis implementation.
 
-To enable the facade in Laravel, add the following alias to the `'aliases'`
-array in *config/app.php*:
+The facade is not auto-aliased in Laravel 5.5+ for future compatibility with
+the PhpRedis extension. To enable the facade in Laravel, add the following
+alias to the `'aliases'` array in *config/app.php*:
 
 ```php
 'aliases' => [
@@ -684,71 +722,53 @@ how it handles connections to Sentinel servers.
 Set the value of this variable to `redis-sentinel` to [override Laravel's
 standard Redis API][s-override-redis-api].
 
-### `CACHE_DRIVER`, `SESSION_DRIVER`, `QUEUE_DRIVER`
+### `BROADCAST_DRIVER`, `CACHE_DRIVER`, `SESSION_DRIVER`, `QUEUE_DRIVER`
 
-Laravel uses these to select the backends for the application cache, session,
-and queue services. Set the value to `redis-sentinel` for each service that the
-application should use Sentinel connections for.
+Laravel uses these to select the backends for the application broadcasting,
+cache, session, and queue services. Set the value to `redis-sentinel` for each
+service that the application should use Sentinel connections for.
 
-### `REDIS_{CACHE,SESSION,QUEUE}_{HOST,PORT,PASSWORD,DATABASE,SERVICE}`
+### `REDIS_{BROADCAST,CACHE,SESSION,QUEUE}_{HOST,PORT,PASSWORD,DATABASE,SERVICE}`
 
 These variables configure service-specific connection parameters when they
-differ from the default Sentinel connection parameters for the cache, session,
-and queue connections.
+differ from the default Sentinel connection parameters for the broadcasting,
+cache, session, and queue connections. For example:
 
- - `REDIS_CACHE_HOST` - Overrides `REDIS_HOST` or `REDIS_SENTINEL_HOST` for
-   the default *cache* connection.
+ - `REDIS_BROADCAST_HOST` - Overrides `REDIS_HOST` or `REDIS_SENTINEL_HOST` for
+   the default *broadcasting* connection.
  - `REDIS_CACHE_PORT` - Overrides `REDIS_PORT` or `REDIS_SENTINEL_PORT` for
    the default *cache* connection.
- - `REDIS_CACHE_PASSWORD` - Overrides `REDIS_PASSWORD` or
-   `REDIS_SENTINEL_PASSWORD` for the default *cache* connection.
- - `REDIS_CACHE_DATABASE` - Overrides `REDIS_DATABASE` or
-   `REDIS_SENTINEL_DATABASE` for the default *cache* connection.
- - `REDIS_CACHE_SERVICE` - Overrides `REDIS_SENTINEL_SERVICE` for the default
-   *cache* connection.
-
-
- - `REDIS_SESSION_HOST` - Overrides `REDIS_HOST` or `REDIS_SENTINEL_HOST` for
-   the default *session* connection.
- - `REDIS_SESSION_PORT` - Overrides `REDIS_PORT` or `REDIS_SENTINEL_PORT` for
-   the default *session* connection.
  - `REDIS_SESSION_PASSWORD` - Overrides `REDIS_PASSWORD` or
    `REDIS_SENTINEL_PASSWORD` for the default *session* connection.
- - `REDIS_SESSION_DATABASE` - Overrides `REDIS_DATABASE` or
-   `REDIS_SENTINEL_DATABASE` for the default *session* connection.
- - `REDIS_SESSION_SERVICE` - Overrides `REDIS_SENTINEL_SERVICE` for the default
-   *session* connection.
-
-
- - `REDIS_QUEUE_HOST` - Overrides `REDIS_HOST` or `REDIS_SENTINEL_HOST` for
-   the default *queue* connection.
- - `REDIS_QUEUE_PORT` - Overrides `REDIS_PORT` or `REDIS_SENTINEL_PORT` for
-   the default *queue* connection.
- - `REDIS_QUEUE_PASSWORD` - Overrides `REDIS_PASSWORD` or
-   `REDIS_SENTINEL_PASSWORD` for the default *queue* connection.
  - `REDIS_QUEUE_DATABASE` - Overrides `REDIS_DATABASE` or
    `REDIS_SENTINEL_DATABASE` for the default *queue* connection.
  - `REDIS_QUEUE_SERVICE` - Overrides `REDIS_SENTINEL_SERVICE` for the default
    *queue* connection.
 
+### `BROADCAST_REDIS_CONNECTION`, `BROADCAST_REDIS_SENTINEL_CONNECTION`
+
+The name of the Sentinel connection to select for application broadcasting when
+`BROADCAST_DRIVER` equals `redis-sentinel`. It defaults to the package's
+internal, auto-configured *broadcasting* connection when unset.
 
 ### `CACHE_REDIS_CONNECTION`, `CACHE_REDIS_SENTINEL_CONNECTION`
 
-The name of the Sentinel connection to set for the application cache when
+The name of the Sentinel connection to select for the application cache when
 `CACHE_DRIVER` equals `redis-sentinel`. It defaults to the package's internal,
 auto-configured *cache* connection when unset.
 
 ### `QUEUE_REDIS_CONNECTION`, `QUEUE_REDIS_SENTINEL_CONNECTION`
 
-The name of the Sentinel connection to set for the application queue when
+The name of the Sentinel connection to select for the application queue when
 `QUEUE_DRIVER` equals `redis-sentinel`. It defaults to the package's internal,
 auto-configured *queue* connection when unset.
 
 ### `SESSION_CONNECTION`
 
-The name of the Sentinel connection to set for storing application sessions
+The name of the Sentinel connection to select for storing application sessions
 when `SESSION_DRIVER` equals `redis-sentinel`. It defaults to the package's
-internal, auto-configured *session* connection when unset.
+internal, auto-configured *session* connection when unset unless the
+application configuration already contains a value for `session.connection`.
 
 Appendix: Configuration Examples
 --------------------------------
@@ -943,6 +963,7 @@ Sentinel Documentation][sentinel].
 [s-standard-config-examples]: #configuration-file-examples
 
 [laravel-env-docs]: https://laravel.com/docs/configuration#environment-configuration
+[laravel-package-discovery-docs]: https://laravel.com/docs/packages#package-discovery
 [laravel-redis-api-docs]: https://laravel.com/docs/redis#interacting-with-redis
 [laravel-redis-docs]: https://laravel.com/docs/redis
 [laravel]: https://laravel.com

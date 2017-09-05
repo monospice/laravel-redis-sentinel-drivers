@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests\Support;
 
+use Illuminate\Broadcasting\BroadcastServiceProvider;
 use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Encryption\EncryptionServiceProvider;
@@ -56,6 +57,11 @@ class ApplicationFactory
     public static function makeLaravelApplication($configure = true)
     {
         $app = new \Illuminate\Foundation\Application();
+
+        if (static::supportsBroadcasting()) {
+            $app->register(new BroadcastServiceProvider($app));
+        }
+
         $app->register(new CacheServiceProvider($app));
         $app->register(new QueueServiceProvider($app));
         $app->register(new SessionServiceProvider($app));
@@ -85,6 +91,7 @@ class ApplicationFactory
 
         if ($configure) {
             $app->configure('database');
+            $app->configure('broadcasting');
             $app->configure('cache');
             $app->configure('queue');
 
@@ -107,6 +114,17 @@ class ApplicationFactory
     public static function isLumen()
     {
         return class_exists('Laravel\Lumen\Application');
+    }
+
+    /**
+     * Determine if the test is running against a Laravel or Lumen framework
+     * that supports the broadcasting API (version 5.1+).
+     *
+     * @return bool True if the framework supports broadcasting
+     */
+    public static function supportsBroadcasting()
+    {
+        return class_exists('Illuminate\Broadcasting\BroadcastManager');
     }
 
     /**
