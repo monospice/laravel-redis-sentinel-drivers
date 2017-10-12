@@ -2,8 +2,8 @@
 
 namespace Monospice\LaravelRedisSentinel\Connectors;
 
-use Illuminate\Redis\Connections\PredisConnection;
 use Illuminate\Support\Arr;
+use Monospice\LaravelRedisSentinel\Connections\PredisSentinelConnection;
 use Monospice\SpicyIdentifiers\DynamicMethod;
 use Predis\Client;
 
@@ -64,7 +64,7 @@ class PredisConnector
         // options array
         $clientOpts = array_diff_key($clientOpts, $sentinelKeys);
 
-        return new PredisConnection(
+        return new PredisSentinelConnection(
             $this->makePredisClient($server, $clientOpts, $sentinelOpts)
         );
     }
