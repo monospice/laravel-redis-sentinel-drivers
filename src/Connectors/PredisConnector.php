@@ -3,8 +3,7 @@
 namespace Monospice\LaravelRedisSentinel\Connectors;
 
 use Illuminate\Support\Arr;
-use Monospice\LaravelRedisSentinel\Connections\PredisSentinelConnection;
-use Monospice\SpicyIdentifiers\DynamicMethod;
+use Monospice\LaravelRedisSentinel\Connections\PredisConnection;
 use Predis\Client;
 
 /**
@@ -27,11 +26,11 @@ class PredisConnector
      *
      * @var array
      */
-    protected $sentinelConnectionOptionKeys = [
-        'sentinel_timeout',
-        'retry_wait',
-        'retry_limit',
-        'update_sentinels',
+    protected $sentinelKeys = [
+        'sentinel_timeout' => null,
+        'retry_wait' => null,
+        'retry_limit' => null,
+        'update_sentinels' => null,
     ];
 
     /**
@@ -57,43 +56,15 @@ class PredisConnector
 
         // Extract the array of Sentinel connection options from the rest of
         // the client options
-        $sentinelKeys = array_flip($this->sentinelConnectionOptionKeys);
-        $sentinelOpts = array_intersect_key($clientOpts, $sentinelKeys);
+        $sentinelOpts = array_intersect_key($clientOpts, $this->sentinelKeys);
 
         // Filter the Sentinel connection options elements from the client
         // options array
-        $clientOpts = array_diff_key($clientOpts, $sentinelKeys);
+        $clientOpts = array_diff_key($clientOpts, $this->sentinelKeys);
 
-        return new PredisSentinelConnection(
-            $this->makePredisClient($server, $clientOpts, $sentinelOpts)
+        return new PredisConnection(
+            new Client($server, $clientOpts),
+            $sentinelOpts
         );
-    }
-
-    /**
-     * Create a Predis Client instance configured with the provided options
-     *
-     * @param array $server       The client configuration for the connection
-     * @param array $clientOpts   Non-sentinel client options
-     * @param array $sentinelOpts Sentinel-specific options
-     *
-     * @return Client The Predis Client configured for Sentinel connections
-     */
-    protected function makePredisClient(
-        array $server,
-        array $clientOpts,
-        array $sentinelOpts
-    ) {
-        $client = new Client($server, $clientOpts);
-        $connection = $client->getConnection();
-
-        // Set the Sentinel-specific connection options on the Predis Client
-        // connection
-        foreach ($sentinelOpts as $option => $value) {
-            DynamicMethod::parseFromUnderscore($option)
-                ->prepend('set')
-                ->callOn($connection, [ $value ]);
-        }
-
-        return $client;
     }
 }
