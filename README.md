@@ -20,11 +20,13 @@ erases stored session information as well.
 
 This package wraps the configuration of Laravel's broadcasting, cache, session,
 and queue APIs for Sentinel with the ability to set options for our Redis
-services independently. We configure the package separately from Laravel's
-standard Redis configuration so we can choose to use the Sentinel connections
-as needed by the environment. A developer may use a standalone Redis server in
-their local environment, while production environments operate a Redis Sentinel
-set of servers.
+services independently. It adds Sentinel support for [Laravel Horizon][s-horizon]
+and fixes other compatibility issues.
+
+We configure the package separately from Laravel's standard Redis configuration
+so we can choose to use the Sentinel connections as needed by the environment.
+A developer may use a standalone Redis server in their local environment, while
+production environments operate a Redis Sentinel set of servers.
 
 
 Contents
@@ -42,6 +44,7 @@ Contents
  - [Executing Redis Commands (RedisSentinel Facade)][s-facade]
      - [Dependency Injection][s-dependency-injection]
  - [Other Sentinel Considerations][s-considerations]
+ - [Laravel Horizon][s-horizon]
  - [Testing](#testing)
  - [License](#license)
  - [Appendix: Environment Variables][s-appx-env-vars]
@@ -598,6 +601,9 @@ service (`app('redis')`, etc) will operate using the Sentinel connections.
 This makes it easier for developers to use a standalone Redis server in their
 local environments and switch to a full Sentinel set of servers in production.
 
+**Note:** When using the package with [Laravel Horizon][s-horizon], this change
+will cause Horizon to run over a Sentinel connection as well.
+
 
 Executing Redis Commands (RedisSentinel Facade)
 -------------------------------------------------
@@ -724,6 +730,67 @@ published to a channel while re-establishing the connection.
 `pubSubLoop()` with no arguments. This API is *not* protected by Sentinel
 connection failure handling. For high-availability, use the Laravel API by
 passing a closure to `subscribe()` or `psubscribe()`.
+
+
+Laravel Horizon
+---------------
+
+Versions 2.4.0 and greater of this package provide for the use of Sentinel
+connections with the [Laravel Horizon][laravel-horizon] queue management tool
+in compatible applications (Laravel 5.5+).
+
+After [installing Horizon][laravel-horizon-install-docs], we need to update
+some configuration settings in *config/horizon.php*:
+
+If needed, change `'use' => 'default'` to the name of the Sentinel connection
+to use for the Horizon backend as configured in *config/database.php*.
+
+**Important:** The standard `'redis'` connections array in *config/database.php*
+must contain an element with the same key as the Sentinel connection specified
+for the `'use'` directive or Horizon throws an exception. Currently, Horizon
+does not provide a way for this package to handle this behavior, but an
+(in-progress) pull request may eliminate this requirement in the future. This
+element can contain any value (but a matching Redis connection config seems
+most appropriate).
+
+Change the backend driver for Horizon's internal metadata to `'redis-sentinel'`
+by adding the following element to the top-level array:
+
+```php
+'driver' => env('HORIZON_DRIVER', 'redis');
+```
+
+...and assign the value of `redis-sentinel` to `HORIZON_DRIVER` in *.env*.
+
+
+Then, add an entry to the `'waits'` array for any Sentinel queues:
+
+```php
+'waits' => [
+    ...
+    'redis-sentinel:default' => 60,
+],
+```
+
+Next, change the connection driver to `redis-sentinel` for each of the queue
+workers that should use Sentinel connections in the `'environments'` block:
+
+```php
+...
+'supervisor-1' => [
+    'connection' => 'redis-sentinel',
+    ...
+],
+...
+```
+
+Horizon will now use the application's Redis Sentinel connections to monitor
+and process our queues.
+
+**Note:** If we already configured the package to [override Laravel's standard
+Redis API][s-override-redis-api] (by setting `REDIS_DRIVER` to `redis-sentinel`,
+for example), we don't need to change `HORIZON_DRIVER` to `'redis-sentinel'`.
+The package already routes all Redis operations through Sentinel connections.
 
 
 Testing
@@ -1117,6 +1184,7 @@ Sentinel Documentation][sentinel].
 [s-env-config]: #environment-based-configuration
 [s-env-config-examples]: #environment-based-configuration-examples
 [s-facade]: #executing-redis-commands-redissentinel-facade
+[s-horizon]: #laravel-horizon
 [s-hybrid-config]: #hybrid-configuration
 [s-integration-tests]: #integration-tests
 [s-multi-sentinel-example]: #multi-sentinel-connection-configuration
@@ -1129,6 +1197,9 @@ Sentinel Documentation][sentinel].
 [s-standard-config-examples]: #configuration-file-examples
 
 [laravel-env-docs]: https://laravel.com/docs/configuration#environment-configuration
+[laravel-horizon]: https://horizon.laravel.com
+[laravel-horizon-docs]: https://laravel.com/docs/horizon
+[laravel-horizon-install-docs]: https://laravel.com/docs/horizon#installation
 [laravel-package-discovery-docs]: https://laravel.com/docs/packages#package-discovery
 [laravel-redis-api-docs]: https://laravel.com/docs/redis#interacting-with-redis
 [laravel-redis-docs]: https://laravel.com/docs/redis

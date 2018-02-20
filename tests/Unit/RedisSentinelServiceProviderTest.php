@@ -5,7 +5,9 @@ namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
+use Illuminate\Queue\RedisQueue as StandardRedisQueue;
 use Illuminate\Redis\RedisManager;
+use Laravel\Horizon\RedisQueue as HorizonRedisQueue;
 use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinelFactory;
 use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
@@ -136,6 +138,26 @@ class RedisSentinelServiceProviderTest extends TestCase
 
         $this->assertInstanceOf(RedisSentinelManager::class, $redisService);
         $this->assertInstanceOf(RedisSentinelFactory::class, $redisService);
+    }
+
+    public function testRegistersHorizonServiceProvider()
+    {
+        $this->provider->register();
+        $this->provider->boot();
+
+        // We'll verify that the Horizon service provider booted by checking
+        // whether the queue uses Horizon's classes:
+        $connection = $this->app->queue->connection('redis-sentinel');
+
+        $this->assertNotNull($connection);
+
+        if (ApplicationFactory::isHorizonAvailable()
+            && ! ApplicationFactory::isLumen()
+        ) {
+            $this->assertInstanceOf(HorizonRedisQueue::class, $connection);
+        } else {
+            $this->assertInstanceOf(StandardRedisQueue::class, $connection);
+        }
     }
 
     public function testBootExtendsBroadcastConnections()

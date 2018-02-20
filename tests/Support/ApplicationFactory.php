@@ -3,11 +3,20 @@
 namespace Monospice\LaravelRedisSentinel\Tests\Support;
 
 use Illuminate\Broadcasting\BroadcastServiceProvider;
+use Illuminate\Bus\BusServiceProvider;
 use Illuminate\Cache\CacheServiceProvider;
 use Illuminate\Config\Repository as ConfigRepository;
+use Illuminate\Contracts\Console\Kernel as ConsoleContract;
+use Illuminate\Contracts\Debug\ExceptionHandler as HandlerContract;
+use Illuminate\Filesystem\FilesystemServiceProvider;
+use Illuminate\Foundation\Console\Kernel as Console;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Queue\QueueServiceProvider;
 use Illuminate\Redis\RedisServiceProvider;
 use Illuminate\Session\SessionServiceProvider;
+use Illuminate\Support\Facades\Facade;
+use Illuminate\View\ViewServiceProvider;
+use Laravel\Horizon\HorizonServiceProvider;
 use Monospice\LaravelRedisSentinel\Manager;
 
 /**
@@ -22,6 +31,8 @@ use Monospice\LaravelRedisSentinel\Manager;
  */
 class ApplicationFactory
 {
+    const APP_PATH = __DIR__ . '/../../build/app';
+
     /**
      * Bootstrap a Laravel or Lumen application to run tests against.
      *
@@ -38,6 +49,32 @@ class ApplicationFactory
         }
 
         return static::makeLaravelApplication($configure);
+    }
+
+    /**
+     * Bootstrap a Laravel or Lumen application with Artisan console command
+     * support.
+     *
+     * @param bool $configure If TRUE, configure default application components
+     * for tests
+     *
+     * @return \Illuminate\Contracts\Container\Container The appropriate
+     * application instance for the framework under test
+     */
+    public static function makeForConsole($configure = true)
+    {
+        $app = static::make();
+        $app->config->set('app.env', 'testing');
+
+        $app->register(BusServiceProvider::class);
+        $app->singleton(ConsoleContract::class, Console::class);
+        $app->singleton(HandlerContract::class, ExceptionHandler::class);
+
+        $app->bootstrapWith([ ]);
+
+        $app->make(ConsoleContract::class)->bootstrap();
+
+        return $app;
     }
 
     /**
@@ -65,7 +102,7 @@ class ApplicationFactory
      */
     public static function makeLaravelApplication($configure = true)
     {
-        $app = new \Illuminate\Foundation\Application();
+        $app = new \Illuminate\Foundation\Application(self::APP_PATH);
 
         $app->register(new BroadcastServiceProvider($app));
         $app->register(new CacheServiceProvider($app));
@@ -74,6 +111,8 @@ class ApplicationFactory
         $app->register(new RedisServiceProvider($app));
 
         $app->config = new ConfigRepository();
+
+        Facade::setFacadeApplication($app);
 
         return $app;
     }
@@ -91,8 +130,8 @@ class ApplicationFactory
         // Set the base path so the application doesn't attempt to use the
         // package's config directory as the application config directory
         // during tests:
-        $app = new \Laravel\Lumen\Application(__DIR__ . '/..');
-        $app->instance('path.storage', __DIR__ . '/../../build');
+        $app = new \Laravel\Lumen\Application(self::APP_PATH);
+        $app->instance('path.storage', self::APP_PATH . '/storage');
 
         if ($configure) {
             $app->register(RedisServiceProvider::class);
@@ -102,7 +141,27 @@ class ApplicationFactory
             $app->configure('queue');
         }
 
+        Facade::setFacadeApplication($app);
+
         return $app;
+    }
+
+    /**
+     * Sets up some boilerplate so Horizon can boot for integration tests.
+     *
+     * @param \Illuminate\Foundation\Application $app The application instance
+     * to reconfigure.
+     *
+     * @return void
+     */
+    public static function configureHorizonComponents($app)
+    {
+        $app->config->set('database.redis.default', [ ]);
+        $app->config->set('view.paths', [ ]);
+
+        $app->register(FilesystemServiceProvider::class);
+        $app->register(ViewServiceProvider::class);
+        $app->register(HorizonServiceProvider::class);
     }
 
     /**
@@ -113,6 +172,16 @@ class ApplicationFactory
     public static function isLumen()
     {
         return class_exists('Laravel\Lumen\Application');
+    }
+
+    /**
+     * Determine whether Horizon is installed for testing.
+     *
+     * @return bool True if we can test against Horizon.
+     */
+    public static function isHorizonAvailable()
+    {
+        return class_exists('Laravel\Horizon\Horizon');
     }
 
     /**
@@ -137,5 +206,26 @@ class ApplicationFactory
         }
 
         return Manager\Laravel5420RedisSentinelManager::class;
+    }
+
+    /**
+     * Create the minimum application directory tree needed to perform Horizon
+     * integration tests.
+     *
+     * @return void
+     */
+    public static function makeAppDirectorySkeleton()
+    {
+        $tree = [
+            '/bootstrap/cache',
+            '/config',
+            '/storage',
+        ];
+
+        foreach ($tree as $path) {
+            if (! file_exists(self::APP_PATH . $path)) {
+                mkdir(self::APP_PATH . $path, 0755, true);
+            }
+        }
     }
 }

@@ -89,6 +89,20 @@ abstract class IntegrationTestCase extends TestCase
     }
 
     /**
+     * Assert that Redis contains the specified key.
+     *
+     * @param string $key The name of the key to check for.
+     *
+     * @return void
+     */
+    public function assertRedisKeyExists($key)
+    {
+        $message = "When asserting Redis key exists: $key";
+
+        $this->assertTrue($this->testClient->exists($key) === 1, $message);
+    }
+
+    /**
      * Assert that the provided value equals the value at the specified key
      * in Redis.
      *

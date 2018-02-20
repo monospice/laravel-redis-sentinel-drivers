@@ -35,7 +35,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
      */
     public function setUp()
     {
-        $config = require(__DIR__ . '/../stubs/config.php');
+        $config = require(__DIR__ . '/../../stubs/config.php');
         $config = $config['database']['redis-sentinel'];
 
         $version = ApplicationFactory::getVersionedRedisSentinelManagerClass();

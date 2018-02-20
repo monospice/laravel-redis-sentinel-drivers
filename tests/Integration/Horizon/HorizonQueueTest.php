@@ -1,14 +1,14 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests\Integration\Drivers;
+namespace Monospice\LaravelRedisSentinel\Tests\Integration\Horizon;
 
 use Illuminate\Queue\Jobs\RedisJob;
-use Illuminate\Queue\RedisQueue;
+use Laravel\Horizon\RedisQueue as HorizonRedisQueue;
 use Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use Monospice\LaravelRedisSentinel\Tests\Support\IntegrationTestCase;
 
-class QueueTest extends IntegrationTestCase
+class HorizonQueueTest extends IntegrationTestCase
 {
     /**
      * The key of the default ready queue.
@@ -43,21 +43,26 @@ class QueueTest extends IntegrationTestCase
         $app = ApplicationFactory::make();
         $app->config->set(require(__DIR__ . '/../../stubs/config.php'));
         $app->config->set('database.redis-sentinel', $this->config);
-        $app->config->set('horizon.driver', 'default');
+        $app->config->set('horizon.driver', 'redis-sentinel');
         $app->register(RedisSentinelServiceProvider::class);
+        $app->boot();
 
-        if (! ApplicationFactory::isLumen()) {
-            $app->boot();
-        }
+        ApplicationFactory::configureHorizonComponents($app);
 
         $this->subject = $app->queue->connection('redis-sentinel');
     }
 
-    public function testIsARedisQueue()
+    /**
+     * @group horizon
+     */
+    public function testIsAHorizonRedisQueue()
     {
-        $this->assertInstanceOf(RedisQueue::class, $this->subject);
+        $this->assertInstanceOf(HorizonRedisQueue::class, $this->subject);
     }
 
+    /**
+     * @group horizon
+     */
     public function testPushesJobOntoQueue()
     {
         $this->assertRedisListCount(self::QUEUE, 0);
@@ -65,8 +70,12 @@ class QueueTest extends IntegrationTestCase
         $this->subject->push('TestJob');
 
         $this->assertRedisListCount(self::QUEUE, 1);
+        $this->assertRedisKeyExists('horizon:1');
     }
 
+    /**
+     * @group horizon
+     */
     public function testPopsJobOffQueue()
     {
         $this->subject->push('TestJob');
@@ -78,6 +87,9 @@ class QueueTest extends IntegrationTestCase
         $this->assertInstanceOf(RedisJob::class, $job);
     }
 
+    /**
+     * @group horizon
+     */
     public function testMovesDelayedJobsToReady()
     {
         $this->subject->later(0, 'TestJob');

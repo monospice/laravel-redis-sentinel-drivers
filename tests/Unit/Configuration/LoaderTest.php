@@ -5,6 +5,7 @@ namespace Monospice\LaravelRedisSentinel\Tests\Unit\Configuration;
 use Monospice\LaravelRedisSentinel\Configuration\Loader;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
+use UnexpectedValueException;
 
 class LoaderTest extends TestCase
 {
@@ -269,6 +270,45 @@ class LoaderTest extends TestCase
         $this->assertFalse($this->loader->shouldOverrideLaravelRedisApi);
     }
 
+    public function testChecksWhetherApplicationSupportsHorizon()
+    {
+        if (ApplicationFactory::isHorizonAvailable()
+            && ! ApplicationFactory::isLumen()
+        ) {
+            $this->assertTrue($this->loader->horizonAvailable);
+        } else {
+            $this->assertFalse($this->loader->horizonAvailable);
+        }
+    }
+
+    public function testChecksWhetherPackageShouldIntegrateHorizon()
+    {
+        if (! ApplicationFactory::isHorizonAvailable()
+            || ApplicationFactory::isLumen()
+        ) {
+            $this->loader->loadConfiguration();
+            $this->assertFalse($this->loader->shouldIntegrateHorizon);
+
+            return;
+        }
+
+        $this->config->set('horizon.driver', 'redis-sentinel');
+        $this->loader->loadConfiguration();
+        $this->assertTrue($this->loader->shouldIntegrateHorizon);
+
+        $this->config->set('horizon.driver', 'default');
+        $this->loader->loadConfiguration();
+        $this->assertFalse($this->loader->shouldIntegrateHorizon);
+    }
+
+    public function testDetectsApplicationVersion()
+    {
+        $expected = ApplicationFactory::getApplicationVersion();
+        $actual = $this->loader->getApplicationVersion();
+
+        $this->assertEquals($expected, $actual);
+    }
+
     public function testGetsAnApplicationConfigValue()
     {
         $this->config->set('test-key', 'test value');
@@ -371,7 +411,9 @@ class LoaderTest extends TestCase
             );
         }
 
-        $this->assertFalse($this->config->has('redis-sentinel'));
+        // The loader should still set this value to FALSE to avoid reloading
+        // the configuration when cached:
+        $this->assertFalse($this->config->get('redis-sentinel.load_config'));
     }
 
     public function testSetsSessionConnectionIfMissing()
@@ -414,6 +456,45 @@ class LoaderTest extends TestCase
         );
     }
 
+    public function testConfiguresHorizonConnection()
+    {
+        $expected = [ [ 'host' => 'sentinel', 'port' => 26379, ] ];
+
+        $this->config->set('database.redis-sentinel.default', $expected);
+        $this->config->set('horizon.prefix', 'test-prefix:');
+        $expected['options']['prefix'] = 'test-prefix:';
+
+        $this->loader->loadHorizonConfiguration();
+
+        $horizonConfig = $this->config->get('database.redis-sentinel.horizon');
+        $this->assertEquals($expected, $horizonConfig);
+
+        // We set the config value "redis-sentinel.load_horizon" to FALSE after
+        // configuring Horizon connections to skip this step after caching the
+        // application configuration via "artisan config:cache":
+        $this->assertFalse($this->config->get('redis-sentinel.load_horizon'));
+    }
+
+    public function testSkipsLoadingHorizonConfigurationIfCached()
+    {
+        $this->config->set('database.redis-sentinel.horizon', 'expected');
+        $this->config->set('redis-sentinel.load_horizon', false);
+
+        $this->loader->loadHorizonConfiguration();
+
+        $horizonConfig = $this->config->get('database.redis-sentinel.horizon');
+        $this->assertEquals('expected', $horizonConfig);
+    }
+
+    public function testDisallowsUsingNonexistantConnectionForHorizon()
+    {
+        $this->config->set('horizon.use', 'not-a-connection');
+
+        $this->setExpectedException(UnexpectedValueException::class);
+
+        $this->loader->loadHorizonConfiguration();
+    }
+
     public function testCleansPackageConfiguration()
     {
         foreach ($this->configKeys as $configKey) {
@@ -446,7 +527,9 @@ class LoaderTest extends TestCase
 
         $this->loader->loadConfiguration();
 
-        $this->assertFalse($this->config->has('redis-sentinel.load_config'));
+        // The loader should still set this value to FALSE to avoid reloading
+        // the configuration when cached:
+        $this->assertFalse($this->config->get('redis-sentinel.load_config'));
 
         foreach ($this->configKeys as $configKey) {
             $packageConfigKey = "redis-sentinel.$configKey";

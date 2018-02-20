@@ -90,4 +90,29 @@ return [
         'lifetime' => 120,
     ],
 
+    // Represents a subset of config/horizon.php
+    'horizon' => [
+        'use' => 'default',
+        'driver' => 'redis-sentinel',
+        'prefix' => 'horizon:',
+        'waits' => [
+            'redis-sentinel:default' => 60,
+        ],
+        'trim' => [
+            'recent' => 60,
+            'failed' => 10080,
+        ],
+        'environments' => [
+            'testing' => [
+                'supervisor-1' => [
+                    'connection' => 'redis-sentinel',
+                    'queue' => [ 'default' ],
+                    'balance' => 'simple',
+                    'processes' => 1,
+                    'tries' => 1,
+                ],
+            ],
+        ],
+    ],
+
 ];

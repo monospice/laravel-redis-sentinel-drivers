@@ -3,15 +3,16 @@
 namespace Monospice\LaravelRedisSentinel;
 
 use Illuminate\Broadcasting\Broadcasters\RedisBroadcaster;
-use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Cache\RedisStore;
+use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Queue\Connectors\RedisConnector;
 use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
 use Monospice\LaravelRedisSentinel\Contracts\Factory;
-use Monospice\LaravelRedisSentinel\RedisSentinelManager;
+use Monospice\LaravelRedisSentinel\Horizon\HorizonServiceProvider;
+use Monospice\LaravelRedisSentinel\Manager\VersionedManagerFactory;
 
 /**
  * Registers the "redis-sentinel" driver as an available driver for Laravel's
@@ -47,6 +48,12 @@ class RedisSentinelServiceProvider extends ServiceProvider
         if ($this->config->shouldOverrideLaravelRedisApi) {
             $this->removeDeferredRedisServices();
         }
+
+        if ($this->config->shouldIntegrateHorizon) {
+            $horizon = new HorizonServiceProvider($this->app, $this->config);
+            $horizon->register();
+            $horizon->boot();
+        }
     }
 
     /**
@@ -76,12 +83,8 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     protected function registerServices()
     {
-        $this->app->singleton('redis-sentinel', function ($app) {
-            $class = $this->config->getVersionedRedisSentinelManagerClass();
-            $config = $this->config->get('database.redis-sentinel', [ ]);
-            $driver = Arr::pull($config, 'client', 'predis');
-
-            return new RedisSentinelManager(new $class($driver, $config));
+        $this->app->singleton('redis-sentinel', function () {
+            return VersionedManagerFactory::make($this->config);
         });
 
         $this->app->singleton('redis-sentinel.manager', function ($app) {
@@ -118,7 +121,12 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $this->addRedisSentinelBroadcaster();
         $this->addRedisSentinelCacheStore();
-        $this->addRedisSentinelQueueConnector();
+
+        // This package's Horizon service provider will set up the queue
+        // connector a bit differently, so we don't need to do it twice:
+        if (! $this->config->shouldIntegrateHorizon) {
+            $this->addRedisSentinelQueueConnector();
+        }
 
         // Since version 5.2, Lumen does not include support for sessions by
         // default, so we'll only register the session handler if enabled:

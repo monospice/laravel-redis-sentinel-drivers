@@ -4,9 +4,11 @@ namespace Monospice\LaravelRedisSentinel\Configuration;
 
 use Illuminate\Foundation\Application as LaravelApplication;
 use Illuminate\Support\Arr;
+use Laravel\Horizon\Horizon;
 use Laravel\Lumen\Application as LumenApplication;
 use Monospice\LaravelRedisSentinel\Configuration\HostNormalizer;
 use Monospice\LaravelRedisSentinel\Manager;
+use UnexpectedValueException;
 
 /**
  * The internal configuration loader for the package. Used by the package's
@@ -70,6 +72,20 @@ class Loader
     const CONFIG_PATH = __DIR__ . '/../../config/redis-sentinel.php';
 
     /**
+     * Flag that indicates whether the package should check that the framework
+     * runs full Laravel before loading Horizon support.
+     *
+     * Horizon does not yet officially support Lumen applications, so the
+     * package will not configure itself for Horizon in Lumen applications by
+     * default. Set this value to TRUE in bootstrap/app.php to short-circuit
+     * the check and attempt to load Horizon support anyway. This provides for
+     * testing unofficial Lumen implementations. Use at your own risk.
+     *
+     * @var bool
+     */
+    public static $ignoreHorizonRequirements = false;
+
+    /**
      * Indicates whether the current application runs the Lumen framework.
      *
      * @var bool
@@ -90,6 +106,21 @@ class Loader
      * @var bool
      */
     public $shouldOverrideLaravelRedisApi;
+
+    /**
+     * Indicates whether Laravel Horizon is installed. Currently FALSE in Lumen.
+     *
+     * @var bool
+     */
+    public $horizonAvailable;
+
+    /**
+     * Indicates whether the package should integrate with Laravel Horizon
+     * based on availability and the value of the "horizon.driver" directive.
+     *
+     * @var bool
+     */
+    public $shouldIntegrateHorizon;
 
     /**
      * The current Laravel or Lumen application instance that provides context
@@ -133,6 +164,8 @@ class Loader
 
         $this->isLumen = $app instanceof $lumenApplicationClass;
         $this->supportsSessions = $app->bound('session');
+        $this->horizonAvailable = static::$ignoreHorizonRequirements
+            || ! $this->isLumen && class_exists(Horizon::class);
     }
 
     /**
@@ -160,10 +193,6 @@ class Loader
     public function loadConfiguration()
     {
         if ($this->shouldLoadConfiguration()) {
-            if ($this->isLumen) {
-                $this->configureLumenComponents();
-            }
-
             $this->loadPackageConfiguration();
         }
 
@@ -171,30 +200,47 @@ class Loader
         $redisDriver = $this->config->get('database.redis.driver');
         $this->shouldOverrideLaravelRedisApi = $redisDriver === 'redis-sentinel'
             || $redisDriver === 'sentinel';
+
+        $this->shouldIntegrateHorizon = $this->horizonAvailable
+            && $this->config->get('horizon.driver') === 'redis-sentinel';
     }
 
     /**
-     * Get the fully-qualified class name of the RedisSentinelManager class
-     * for the current version of Laravel or Lumen.
+     * Sets the Horizon Redis Sentinel connection configuration.
      *
-     * @return string The class name of the appropriate RedisSentinelManager
-     * with its namespace
+     * @return void
      */
-    public function getVersionedRedisSentinelManagerClass()
+    public function loadHorizonConfiguration()
+    {
+        // We set the config value "redis-sentinel.load_horizon" to FALSE after
+        // configuring Horizon connections to skip this step after caching the
+        // application configuration via "artisan config:cache":
+        if ($this->config->get('redis-sentinel.load_horizon', true) !== true) {
+            return;
+        }
+
+        $horizonConfig = $this->getSelectedHorizonConnectionConfiguration();
+        $options = Arr::get($horizonConfig, 'options', [ ]);
+        $options['prefix'] = $this->config->get('horizon.prefix', 'horizon:');
+
+        $horizonConfig['options'] = $options;
+
+        $this->config->set('database.redis-sentinel.horizon', $horizonConfig);
+        $this->config->set('redis-sentinel.load_horizon', false);
+    }
+
+    /**
+     * Get the version number of the current Laravel or Lumen application.
+     *
+     * @return string The version as declared by the framework.
+     */
+    public function getApplicationVersion()
     {
         if ($this->isLumen) {
-            $appVersion = substr($this->app->version(), 7, 3); // ex. "5.4"
-            $frameworkVersion = '5.4';
-        } else {
-            $appVersion = \Illuminate\Foundation\Application::VERSION;
-            $frameworkVersion = '5.4.20';
+            return substr($this->app->version(), 7, 3); // ex. "5.4"
         }
 
-        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
-            return Manager\Laravel540RedisSentinelManager::class;
-        }
-
-        return Manager\Laravel5420RedisSentinelManager::class;
+        return \Illuminate\Foundation\Application::VERSION;
     }
 
     /**
@@ -271,6 +317,30 @@ class Loader
     }
 
     /**
+     * Copy the Redis Sentinel connection configuration to use for Horizon
+     * connections from the connection specified by "horizon.use".
+     *
+     * @return array The configuration matching the connection name specified
+     * by the "horizon.use" config directive.
+     *
+     * @throws UnexpectedValueException If no Redis Sentinel connection matches
+     * the name declared by "horizon.use".
+     */
+    protected function getSelectedHorizonConnectionConfiguration()
+    {
+        $use = $this->config->get('horizon.use', 'default');
+        $connectionConfig = $this->config->get("database.redis-sentinel.$use");
+
+        if ($connectionConfig === null) {
+            throw new UnexpectedValueException(
+                "The Horizon Redis Sentinel connection [$use] is not defined."
+            );
+        }
+
+        return $connectionConfig;
+    }
+
+    /**
      * Reconcile the package configuration and use it to set the appropriate
      * configuration values for other application components.
      *
@@ -278,6 +348,10 @@ class Loader
      */
     protected function loadPackageConfiguration()
     {
+        if ($this->isLumen) {
+            $this->configureLumenComponents();
+        }
+
         $this->setConfigurationFor('database.redis-sentinel');
         $this->setConfigurationFor('database.redis.driver');
         $this->setConfigurationFor('broadcasting.connections.redis-sentinel');
@@ -287,9 +361,7 @@ class Loader
 
         $this->normalizeHosts();
 
-        if ($this->packageConfig !== null) {
-            $this->cleanPackageConfiguration();
-        }
+        $this->cleanPackageConfiguration();
     }
 
     /**
@@ -401,13 +473,13 @@ class Loader
         // the reference so that it can be garbage-collected:
         $this->packageConfig = null;
 
-        if ($this->config->get('redis-sentinel.clean_config', true) !== true) {
-            return;
+        if ($this->config->get('redis-sentinel.clean_config', true) === true) {
+            $this->config->set('redis-sentinel', [
+                'Config merged. Set redis-sentinel.clean_config=false to keep.',
+            ]);
         }
 
-        $this->config->set('redis-sentinel', [
-            'Config merged. Set "redis-sentinel.clean_config" = false to keep.',
-            'load_config' => false, // skip loading package config when cached
-        ]);
+        // Skip loading package config when cached:
+        $this->config->set('redis-sentinel.load_config', false);
     }
 }
