@@ -4,6 +4,7 @@ namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\Connections\Connection;
+use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinelFactory;
 use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Mockery;
@@ -56,6 +57,11 @@ class RedisSentinelManagerTest extends TestCase
     public function testImplementsRedisFactoryForSwapability()
     {
         $this->assertInstanceOf(RedisFactory::class, $this->manager);
+    }
+
+    public function testIsRedisSentinelFactory()
+    {
+        $this->assertInstanceOf(RedisSentinelFactory::class, $this->manager);
     }
 
     public function testGetsVersionedRedisSentinelManagerInstance()

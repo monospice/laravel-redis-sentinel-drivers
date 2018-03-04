@@ -6,6 +6,8 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\RedisManager;
+use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinelFactory;
+use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 use Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
@@ -86,6 +88,31 @@ class RedisSentinelServiceProviderTest extends TestCase
 
         $this->assertInstanceOf(RedisSentinelManager::class, $service);
         $this->assertInstanceOf(RedisFactory::class, $service);
+        $this->assertInstanceOf(RedisSentinelFactory::class, $service);
+    }
+
+    public function testRegistersVersionedManagerWithApplication()
+    {
+        $this->provider->register();
+
+        $this->assertArrayHasKey('redis-sentinel.manager', $this->app);
+
+        $service = $this->app->make('redis-sentinel.manager');
+
+        $this->assertInstanceOf(RedisFactory::class, $service);
+        $this->assertInstanceOf(RedisSentinelFactory::class, $service);
+    }
+
+    public function testAliasesContractForInjection()
+    {
+        $this->provider->register();
+
+        $this->assertArrayHasKey(RedisSentinelFactory::class, $this->app);
+
+        $service = $this->app->make(RedisSentinelFactory::class);
+
+        $this->assertInstanceOf(RedisSentinelManager::class, $service);
+        $this->assertInstanceOf(RedisFactory::class, $service);
     }
 
     public function testRegisterPreservesStandardRedisApi()
@@ -96,6 +123,7 @@ class RedisSentinelServiceProviderTest extends TestCase
         $redisService = $this->app->make('redis');
 
         $this->assertInstanceOf(RedisManager::class, $redisService);
+        $this->assertNotInstanceOf(RedisSentinelManager::class, $redisService);
     }
 
     public function testRegisterOverridesStandardRedisApi()
@@ -107,6 +135,7 @@ class RedisSentinelServiceProviderTest extends TestCase
         $redisService = $this->app->make('redis');
 
         $this->assertInstanceOf(RedisSentinelManager::class, $redisService);
+        $this->assertInstanceOf(RedisSentinelFactory::class, $redisService);
     }
 
     public function testBootExtendsBroadcastConnections()

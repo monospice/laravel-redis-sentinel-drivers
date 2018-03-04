@@ -10,6 +10,7 @@ use Illuminate\Session\CacheBasedSessionHandler;
 use Illuminate\Support\Arr;
 use Illuminate\Support\ServiceProvider;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
+use Monospice\LaravelRedisSentinel\Contracts\Factory;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 
 /**
@@ -58,6 +59,23 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $this->config = ConfigurationLoader::load($this->app);
 
+        $this->registerServices();
+
+        // If we want Laravel's Redis API to use Sentinel, we'll return an
+        // instance of the RedisSentinelManager when requesting the "redis"
+        // service:
+        if ($this->config->shouldOverrideLaravelRedisApi) {
+            $this->registerOverrides();
+        }
+    }
+
+    /**
+     * Register the core Redis Sentinel connection manager.
+     *
+     * @return void
+     */
+    protected function registerServices()
+    {
         $this->app->singleton('redis-sentinel', function ($app) {
             $class = $this->config->getVersionedRedisSentinelManagerClass();
             $config = $this->config->get('database.redis-sentinel', [ ]);
@@ -66,12 +84,11 @@ class RedisSentinelServiceProvider extends ServiceProvider
             return new RedisSentinelManager(new $class($driver, $config));
         });
 
-        // If we want Laravel's Redis API to use Sentinel, we'll return an
-        // instance of the RedisSentinelManager when requesting the "redis"
-        // service:
-        if ($this->config->shouldOverrideLaravelRedisApi) {
-            $this->registerOverrides();
-        }
+        $this->app->singleton('redis-sentinel.manager', function ($app) {
+            return $app->make('redis-sentinel')->getVersionedManager();
+        });
+
+        $this->app->alias('redis-sentinel', Factory::class);
     }
 
     /**
@@ -87,7 +104,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
         });
 
         $this->app->bind('redis.connection', function ($app) {
-            return $app->make('redis-sentinel')->connection();
+            return $app->make('redis-sentinel.manager')->connection();
         });
     }
 
@@ -140,7 +157,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
     {
         $this->app->make(BroadcastFactory::class)
             ->extend('redis-sentinel', function ($app, $conf) {
-                $redis = $app->make('redis-sentinel')->getVersionedManager();
+                $redis = $app->make('redis-sentinel.manager');
                 $connection = Arr::get($conf, 'connection', 'default');
 
                 return new RedisBroadcaster($redis, $connection);
@@ -158,7 +175,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
         $cache = $this->app->make('cache');
 
         $cache->extend('redis-sentinel', function ($app, $conf) use ($cache) {
-            $redis = $app->make('redis-sentinel')->getVersionedManager();
+            $redis = $app->make('redis-sentinel.manager');
             $prefix = $app->make('config')->get('cache.prefix');
             $connection = Arr::get($conf, 'connection', 'default');
             $store = new RedisStore($redis, $prefix, $connection);
@@ -195,7 +212,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
     protected function addRedisSentinelQueueConnector()
     {
         $this->app->make('queue')->extend('redis-sentinel', function () {
-            $redis = $this->app->make('redis-sentinel')->getVersionedManager();
+            $redis = $this->app->make('redis-sentinel.manager');
 
             return new RedisConnector($redis);
         });

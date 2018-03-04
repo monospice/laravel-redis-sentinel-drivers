@@ -39,6 +39,7 @@ Contents
      - [Hybrid Configuration][s-hybrid-config]
  - [Override the Standard Redis API][s-override-redis-api]
  - [Executing Redis Commands (RedisSentinel Facade)][s-facade]
+     - [Dependency Injection][s-dependency-injection]
  - [Testing](#testing)
  - [License](#license)
  - [Appendix: Environment Variables][s-appx-env-vars]
@@ -625,6 +626,37 @@ In Lumen, add the alias to *bootstrap/app.php*:
 class_alias('Monospice\LaravelRedisSentinel\RedisSentinel', 'RedisSentinel');
 ```
 
+### Dependency Injection
+
+For those that prefer to declare the Redis Sentinel manager as a dependency of
+a class rather than using the facade, we can type-hint the interface that the
+container will resolve when building an object from the container:
+
+```php
+use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinel;
+...
+public function __construct(RedisSentinel $sentinel)
+{
+    $sentinel->get('some-key');
+}
+```
+
+The above explicitly requests an instance of the package's Sentinel service. If
+we [override the Redis API][s-override-redis-api], we can use the standard
+Redis contract instead, and the application will inject the appropriate service
+based on the configuration:
+
+```php
+use Illuminate\Contracts\Redis\Factory as Redis;
+...
+public function __construct(Redis $redis)
+{
+    // Either a Sentinel connection or a standard Redis connection depending on
+    // the value of REDIS_DRIVER or config('database.redis.driver'):
+    $redis->get('some-key');
+}
+```
+
 Testing
 -------
 
@@ -948,6 +980,7 @@ Sentinel Documentation][sentinel].
 
 [s-appx-env-vars]: #appendix-environment-variables
 [s-appx-examples]: #appendix-configuration-examples
+[s-dependency-injection]: #dependency-injection
 [s-dev-vs-prod-example]: #development-vs-production
 [s-env-config]: #environment-based-configuration
 [s-env-config-examples]: #environment-based-configuration-examples

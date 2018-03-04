@@ -6,6 +6,7 @@ use Illuminate\Redis\RedisManager;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Monospice\LaravelRedisSentinel\Connectors;
+use Monospice\LaravelRedisSentinel\Contracts\Factory;
 
 /**
  * Contains common functionality for the RedisSentinelManager implementations
@@ -17,7 +18,9 @@ use Monospice\LaravelRedisSentinel\Connectors;
  * @license  See LICENSE file
  * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
  */
-abstract class VersionedRedisSentinelManager extends RedisManager
+abstract class VersionedRedisSentinelManager
+    extends RedisManager
+    implements Factory
 {
     /**
      * Get the Redis Connection instance represented by the specified name

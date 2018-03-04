@@ -3,8 +3,10 @@
 namespace Monospice\LaravelRedisSentinel\Tests;
 
 use Closure;
+use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\RedisManager;
 use InvalidArgumentException;
+use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinelFactory;
 use Monospice\LaravelRedisSentinel\Manager;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
@@ -53,6 +55,16 @@ class VersionedRedisSentinelManagerTest extends TestCase
     public function testExtendsRedisManagerForSwapability()
     {
         $this->assertInstanceOf(RedisManager::class, $this->manager);
+    }
+
+    public function testIsRedisFactory()
+    {
+        $this->assertInstanceOf(RedisFactory::class, $this->manager);
+    }
+
+    public function testIsRedisSentinelFactory()
+    {
+        $this->assertInstanceOf(RedisSentinelFactory::class, $this->manager);
     }
 
     public function testCreatesSentinelPredisClientsForEachConnection()

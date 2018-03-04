@@ -2,7 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel;
 
-use Illuminate\Contracts\Redis\Factory;
+use Monospice\LaravelRedisSentinel\Contracts\Factory;
 use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\SpicyIdentifiers\DynamicMethod;
 
