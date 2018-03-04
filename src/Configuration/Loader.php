@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application as LaravelApplication;
 use Illuminate\Support\Arr;
 use Laravel\Lumen\Application as LumenApplication;
 use Monospice\LaravelRedisSentinel\Configuration\HostNormalizer;
+use Monospice\LaravelRedisSentinel\Manager;
 
 /**
  * The internal configuration loader for the package. Used by the package's
@@ -83,6 +84,14 @@ class Loader
     public $supportsSessions;
 
     /**
+     * Indicates whether the package should override Laravel's standard Redis
+     * API ("Redis" facade and "redis" service binding).
+     *
+     * @var bool
+     */
+    public $shouldOverrideLaravelRedisApi;
+
+    /**
      * The current Laravel or Lumen application instance that provides context
      * and services used to load the appropriate configuration.
      *
@@ -150,30 +159,76 @@ class Loader
      */
     public function loadConfiguration()
     {
-        if (! $this->shouldLoadConfiguration()) {
-            return;
+        if ($this->shouldLoadConfiguration()) {
+            if ($this->isLumen) {
+                $this->configureLumenComponents();
+            }
+
+            $this->loadPackageConfiguration();
         }
 
-        if ($this->isLumen) {
-            $this->configureLumenComponents();
-        }
-
-        $this->loadPackageConfiguration();
+        // Previous versions of the package looked for the value 'sentinel':
+        $redisDriver = $this->config->get('database.redis.driver');
+        $this->shouldOverrideLaravelRedisApi = $redisDriver === 'redis-sentinel'
+            || $redisDriver === 'sentinel';
     }
 
     /**
-     * Determine whether the package should override Laravel's standard Redis
-     * API ("Redis" facade and "redis" service binding).
+     * Get the fully-qualified class name of the RedisSentinelManager class
+     * for the current version of Laravel or Lumen.
      *
-     * @return bool TRUE if the package should override Laravel's standard
-     * Redis API
+     * @return string The class name of the appropriate RedisSentinelManager
+     * with its namespace
      */
-    public function shouldOverrideLaravelRedisApi()
+    public function getVersionedRedisSentinelManagerClass()
     {
-        $redisDriver = $this->config->get('database.redis.driver');
+        if ($this->isLumen) {
+            $appVersion = substr($this->app->version(), 7, 3); // ex. "5.4"
+            $frameworkVersion = '5.4';
+        } else {
+            $appVersion = \Illuminate\Foundation\Application::VERSION;
+            $frameworkVersion = '5.4.20';
+        }
 
-        // Previous versions of the package looked for the value 'sentinel':
-        return $redisDriver === 'redis-sentinel' || $redisDriver === 'sentinel';
+        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
+            return Manager\Laravel540RedisSentinelManager::class;
+        }
+
+        return Manager\Laravel5420RedisSentinelManager::class;
+    }
+
+    /**
+     * Fetch the specified application configuration value.
+     *
+     * This helper method enables the package's service providers to get config
+     * values without having to resolve the config service from the container.
+     *
+     * @param string|array $key     The key(s) for the value(s) to fetch.
+     * @param mixed        $default Returned if the key does not exist.
+     *
+     * @return mixed The requested configuration value or the provided default
+     * if the key does not exist.
+     */
+    public function get($key, $default = null)
+    {
+        return $this->config->get($key, $default);
+    }
+
+    /**
+     * Set the specified application configuration value.
+     *
+     * This helper method enables the package's service providers to set config
+     * values without having to resolve the config service from the container.
+     *
+     * @param string|array $key   The key of the value or a tree of values as
+     * an associative array.
+     * @param mixed        $value The value to set for the specified key.
+     *
+     * @return void
+     */
+    public function set($key, $value = null)
+    {
+        $this->config->set($key, $value);
     }
 
     /**
@@ -342,6 +397,10 @@ class Loader
      */
     protected function cleanPackageConfiguration()
     {
+        // When we're finished with the internal package configuration, break
+        // the reference so that it can be garbage-collected:
+        $this->packageConfig = null;
+
         if ($this->config->get('redis-sentinel.clean_config', true) !== true) {
             return;
         }

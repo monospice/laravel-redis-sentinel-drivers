@@ -252,15 +252,35 @@ class LoaderTest extends TestCase
 
     public function testChecksWhetherPackageShouldOverrideRedisApi()
     {
+        $this->startTestWithConfiguredApplication();
         $this->config->set('database.redis.driver', 'redis-sentinel');
-        $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi());
+        $this->loader->loadConfiguration();
+        $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi);
 
-        // Previous versios of the package looked for the value 'sentinel':
+        // Previous versions of the package looked for the value 'sentinel':
+        $this->startTestWithConfiguredApplication();
         $this->config->set('database.redis.driver', 'sentinel');
-        $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi());
+        $this->loader->loadConfiguration();
+        $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi);
 
+        $this->startTestWithConfiguredApplication();
         $this->config->set('database.redis.driver', 'default');
-        $this->assertFalse($this->loader->shouldOverrideLaravelRedisApi());
+        $this->loader->loadConfiguration();
+        $this->assertFalse($this->loader->shouldOverrideLaravelRedisApi);
+    }
+
+    public function testGetsAnApplicationConfigValue()
+    {
+        $this->config->set('test-key', 'test value');
+
+        $this->assertEquals('test value', $this->loader->get('test-key'));
+    }
+
+    public function testSetsAnApplicationConfigValue()
+    {
+        $this->loader->set('test-key', 'test value');
+
+        $this->assertEquals('test value', $this->config->get('test-key'));
     }
 
     public function testLoadsLumenConfigurationDependencies()
