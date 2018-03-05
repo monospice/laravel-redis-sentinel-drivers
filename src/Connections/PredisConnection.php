@@ -2,10 +2,13 @@
 
 namespace Monospice\LaravelRedisSentinel\Connections;
 
+use Closure;
 use Illuminate\Redis\Connections\PredisConnection as LaravelPredisConnection;
 use Monospice\SpicyIdentifiers\DynamicMethod;
 use Predis\ClientInterface as Client;
 use Predis\CommunicationException;
+use Predis\PubSub\Consumer as PubSub;
+use RuntimeException;
 
 /**
  * Executes Redis commands using the Predis client.
@@ -122,6 +125,60 @@ class PredisConnection extends LaravelPredisConnection
     }
 
     /**
+     * Subscribe to a set of given channels for messages.
+     *
+     * @param array|string $channels The names of the channels to subscribe to.
+     * @param Closure      $callback Executed for each message. Receives the
+     * message string in the first argument and the message channel as the
+     * second argument. Return FALSE to unsubscribe.
+     * @param string       $method   The subscription command ("subscribe" or
+     * "psubscribe").
+     *
+     * @return void
+     */
+    public function createSubscription(
+        $channels,
+        Closure $callback,
+        $method = 'subscribe'
+    ) {
+        $this->retryOnFailure(function () use ($method, $channels, $callback) {
+            $loop = $this->pubSubLoop([ $method => (array) $channels ]);
+
+            if ($method === 'psubscribe') {
+                $messageKind = 'pmessage';
+            } else {
+                $messageKind = 'message';
+            }
+
+            $this->consumeMessages($loop, $messageKind, $callback);
+
+            unset($loop);
+        });
+    }
+
+    /**
+     * Create a new PUB/SUB subscriber and pass messages to the callback if
+     * provided.
+     *
+     * WARNING: Consumers created using this method are not monitored for
+     * connection failures. For Sentinel support, use one of the methods
+     * provided by the Laravel API instead (subscribe() and psubscribe()).
+     *
+     * @param array|null $options  Configures the channel(s) to subscribe to.
+     * @param callable   $callback Optional callback executed for each message
+     * published to the configured channel(s).
+     *
+     * @return \Predis\PubSub\Consumer|null A PUB/SUB context used to create
+     * a subscription loop if no callback provided.
+     */
+    public function pubSubLoop($options = null, $callback = null)
+    {
+        // Messages published to the master propagate to each of the slaves. We
+        // pick a random slave to distribute load away from the master:
+        return $this->getRandomSlave()->pubSubLoop($options, $callback);
+    }
+
+    /**
      * Execute commands in a transaction.
      *
      * This package overrides the transaction() method to work around a
@@ -181,6 +238,27 @@ class PredisConnection extends LaravelPredisConnection
     }
 
     /**
+     * Execute the provided callback for each message read by the PUB/SUB
+     * consumer.
+     *
+     * @param PubSub  $loop     Reads the messages published to a channel.
+     * @param string  $kind     The subscribed message type ([p]message).
+     * @param Closure $callback Executed for each message.
+     *
+     * @return void
+     */
+    protected function consumeMessages(PubSub $loop, $kind, Closure $callback)
+    {
+        foreach ($loop as $message) {
+            if ($message->kind === $kind) {
+                if ($callback($message->payload, $message->channel) === false) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
      * Get a Predis client instance for the master.
      *
      * @return Client The client instance for the current master.
@@ -188,5 +266,30 @@ class PredisConnection extends LaravelPredisConnection
     protected function getMaster()
     {
         return $this->client->getClientFor('master');
+    }
+
+    /**
+     * Get a Predis client instance for a random slave.
+     *
+     * @param bool $fallbackToMaster If TRUE, return a client for the master
+     * if the connection does not include any slaves.
+     *
+     * @return Client The client instance for the selected slave.
+     */
+    protected function getRandomSlave($fallbackToMaster = true)
+    {
+        $slaves = $this->client->getConnection()->getSlaves();
+
+        if (count($slaves) > 0) {
+            $slave = $slaves[rand(1, count($slaves)) - 1];
+
+            return $this->client->getClientFor($slave->getParameters()->alias);
+        }
+
+        if ($fallbackToMaster) {
+            return $this->getMaster();
+        }
+
+        throw new RuntimeException('No slave present on connection.');
     }
 }

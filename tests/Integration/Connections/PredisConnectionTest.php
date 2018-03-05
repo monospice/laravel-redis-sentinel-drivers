@@ -9,6 +9,7 @@ use Monospice\LaravelRedisSentinel\Tests\Support\IntegrationTestCase;
 use Predis\Client;
 use Predis\Connection\ConnectionException;
 use Predis\Connection\NodeConnectionInterface;
+use Predis\PubSub\Consumer;
 use Predis\Transaction\MultiExec;
 
 class PredisConnectionTest extends IntegrationTestCase
@@ -19,6 +20,16 @@ class PredisConnectionTest extends IntegrationTestCase
      * @var PredisConnection
      */
     protected $subject;
+
+    /**
+     * Messages to publish and expect for subscribe tests.
+     *
+     * @var array
+     */
+    protected $expectedMessages = [
+        'test-channel-1' => [ 'test message 1', 'test message 2', ],
+        'test-channel-2' => [ 'test message 1', 'test message 2', ],
+    ];
 
     /**
      * Run this setup before each test
@@ -42,6 +53,143 @@ class PredisConnectionTest extends IntegrationTestCase
         parent::tearDown();
 
         Mockery::close();
+    }
+
+    public function testAllowsSubscriptionsOnAggregateConnection()
+    {
+        // The Predis client itself does not currently support subscriptions on
+        // Sentinel connections and throws an exception that this class fixes.
+        $this->assertInstanceOf(Consumer::class, $this->subject->pubSubLoop());
+    }
+
+    public function testSubscribesToPubSubChannels()
+    {
+        // Don't block the test with retries if it failed to read the expected
+        // number of messages from the server:
+        $this->subject->setRetryLimit(0);
+
+        foreach ([ 'createSubscription', 'subscribe' ] as $method) {
+            $received = [ ];
+
+            $test = function ($channels, $count) use (&$received, $method) {
+                $this->subject->$method(
+                    $channels,
+                    function ($message, $channel) use (&$received, &$count) {
+                        $received[$channel][] = $message;
+
+                        if (--$count === 0) {
+                            return false;
+                        }
+                    }
+                );
+            };
+
+            $this->testClient->publishForTest($test, $this->expectedMessages);
+
+            $this->assertEquals($this->expectedMessages, $received);
+        }
+    }
+
+    public function testSubscribesToPubSubChannelsByPattern()
+    {
+        // Don't block the test with retries if it failed to read the expected
+        // number of messages from the server:
+        $this->subject->setRetryLimit(0);
+
+        foreach ([ 'createSubscription', 'psubscribe' ] as $method) {
+            $received = [ ];
+
+            $test = function ($channels, $count) use (&$received, $method) {
+                $this->subject->$method(
+                    'test-channel-*',
+                    function ($message, $channel) use (&$received, &$count) {
+                        $received[$channel][] = $message;
+
+                        if (--$count === 0) {
+                            return false;
+                        }
+                    },
+                    'psubscribe'
+                );
+            };
+
+            $this->testClient->publishForTest($test, $this->expectedMessages);
+
+            $this->assertEquals($this->expectedMessages, $received);
+        }
+    }
+
+    public function testSubscribesToPubSubChannelsUsingPredisApi()
+    {
+        // Don't block the test with retries if it failed to read the expected
+        // number of messages from the server:
+        $this->subject->setRetryLimit(0);
+
+        $received = [ ];
+
+        $test = function ($channels, $count) use (&$received) {
+            $this->subject->pubSubLoop(
+                [ 'subscribe' => $channels ],
+                function ($loop, $message) use (&$received, &$count) {
+                    if ($message->kind === 'message') {
+                        $received[$message->channel][] = $message->payload;
+
+                        if (--$count === 0) {
+                            return false;
+                        }
+                    }
+                }
+            );
+        };
+
+        $this->testClient->publishForTest($test, $this->expectedMessages);
+
+        $this->assertEquals($this->expectedMessages, $received);
+    }
+
+    public function testRetriesSubscriptionWhenConnectionFails()
+    {
+        $this->switchToMinimumTimeout();
+
+        $expectedRetries = 2;
+        $this->subject = new PredisConnection($this->makeClientSpy());
+        $this->subject->setRetryLimit($expectedRetries);
+        $this->subject->setRetryWait(0); // retry immediately
+
+        // With a read-write timeout, Predis throws a ConnectionException if
+        // nothing publishes to the channel for the duration specified by the
+        // timeout value. We'll use this with a low timeout to simulate a real
+        // connection failure so we don't need to block a server manually.
+        try {
+            $this->subject->subscribe([ 'channel' ], function () {
+                return false;
+            });
+        } catch (ConnectionException $exception) {
+            // With PHPUnit, we need to wrap the throwing block to perform
+            // assertions afterward.
+        }
+
+        $this->subject->client()->getConnection() // +1 for initial attempt:
+            ->shouldHaveReceived('querySentinel')->times($expectedRetries + 1);
+    }
+
+    public function testSubscribesToSlaveByDefault()
+    {
+        $loop = $this->subject->pubSubLoop();
+        $role = $loop->getClient()->executeRaw([ 'ROLE' ]);
+
+        $this->assertEquals('slave', $role[0]);
+    }
+
+    public function testSubscribeFallsBackToMaster()
+    {
+        $this->subject->client()->getConnection()
+            ->shouldReceive('getSlaves')->andReturn([ ]);
+
+        $loop = $this->subject->pubSubLoop();
+        $role = $loop->getClient()->executeRaw([ 'ROLE' ]);
+
+        $this->assertEquals('master', $role[0]);
     }
 
     public function testAllowsTransactionsOnAggregateConnection()
@@ -121,7 +269,7 @@ class PredisConnectionTest extends IntegrationTestCase
 
     public function testCanReconnectWhenConnectionFails()
     {
-        $retries = (2 / $this->switchToMinimumTimeout()) + 1;
+        $retries = ceil(2 / $this->switchToMinimumTimeout()) + 1;
         $attempts = 0;
 
         $this->subject = new PredisConnection($this->makeClientSpy());

@@ -109,8 +109,8 @@ abstract class IntegrationTestCase extends TestCase
      * Assert that the number of items in the Redis list at the specified key
      * equals the provided count.
      *
-     * @param string $key     The key of the list in Redis to compare
-     * @param int    expected The number of items that the list should contain.
+     * @param string $key      The key of the list in Redis to compare
+     * @param int    $expected The number of items that the list should contain.
      *
      * @return void
      */
@@ -126,8 +126,8 @@ abstract class IntegrationTestCase extends TestCase
      * Assert that the number of items in the Redis sorted set at the specified
      * key equals the provided count.
      *
-     * @param string $key     The key of the sorted set in Redis to compare
-     * @param int    expected The number of items that the set should contain.
+     * @param string $key      The key of the sorted set in Redis to compare
+     * @param int    $expected The number of items that the set should contain.
      *
      * @return void
      */

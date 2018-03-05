@@ -59,6 +59,46 @@ class TestClient
     }
 
     /**
+     * Publish the supplied messages to the specified channels after executing
+     * the provided callback.
+     *
+     * @param Closure $callback Executes subscribe() or psubscribe() commands.
+     * Receives an array of channel names in first argument and the number of
+     * messages to wait for.
+     * @param array   $messages Two-dimensional array keyed by channel names.
+     * Each contains an array of message strings to publish on the channel.
+     *
+     * @return void
+     */
+    public function publishForTest(Closure $callback, array $messages)
+    {
+        $callback = function () use ($messages, $callback) {
+            $channels = array_keys($messages);
+            $count = count(call_user_func_array('array_merge', $messages));
+
+            $callback($channels, $count);
+        };
+
+        $stringMessages = var_export($messages, true);
+
+        $process = $this->makeBackgroundCommandProcessForMaster("
+            usleep(100000);
+
+            foreach ($stringMessages as \$channel => \$messages) {
+                foreach (\$messages as \$message) {
+                    \$client->publish(\$channel, \$message);
+                }
+            }
+        ");
+
+        $process->mustRun(function ($type, $buffer) use ($callback) {
+            if ($buffer === self::BACKGROUND_PROCESS_READY_BEACON) {
+                $callback();
+            }
+        });
+    }
+
+    /**
      * Signal the current Redis master to sleep for the specified number of
      * seconds.
      *
@@ -86,6 +126,7 @@ class TestClient
 
         $process->mustRun(function ($type, $buffer) use ($callback) {
             if ($buffer === self::BACKGROUND_PROCESS_READY_BEACON) {
+                usleep(1000);
                 $callback();
             }
         });
