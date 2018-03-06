@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Mockery;
 use Monospice\LaravelRedisSentinel\RedisSentinel;

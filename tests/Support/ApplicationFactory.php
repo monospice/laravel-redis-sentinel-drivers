@@ -8,7 +8,18 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Queue\QueueServiceProvider;
 use Illuminate\Redis\RedisServiceProvider;
 use Illuminate\Session\SessionServiceProvider;
+use Monospice\LaravelRedisSentinel\Manager;
 
+/**
+ * Bootstraps Laravel and Lumen application instances based for the version of
+ * the framework installed for testing.
+ *
+ * @category Package
+ * @package  Monospice\LaravelRedisSentinel
+ * @author   Cy Rossignol <cy@rossignols.me>
+ * @license  See LICENSE file
+ * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
+ */
 class ApplicationFactory
 {
     /**
@@ -81,6 +92,7 @@ class ApplicationFactory
         // package's config directory as the application config directory
         // during tests:
         $app = new \Laravel\Lumen\Application(__DIR__ . '/..');
+        $app->instance('path.storage', __DIR__ . '/../../build');
 
         if ($configure) {
             $app->register(RedisServiceProvider::class);
@@ -101,5 +113,29 @@ class ApplicationFactory
     public static function isLumen()
     {
         return class_exists('Laravel\Lumen\Application');
+    }
+
+    /**
+     * Get the fully-qualified class name of the RedisSentinelManager class
+     * for the current version of Laravel or Lumen under test.
+     *
+     * @return string The class name of the appropriate RedisSentinelManager
+     * with its namespace
+     */
+    public static function getVersionedRedisSentinelManagerClass()
+    {
+        $appVersion = static::getApplicationVersion();
+
+        if (static::isLumen()) {
+            $frameworkVersion = '5.4';
+        } else {
+            $frameworkVersion = '5.4.20';
+        }
+
+        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
+            return Manager\Laravel540RedisSentinelManager::class;
+        }
+
+        return Manager\Laravel5420RedisSentinelManager::class;
     }
 }

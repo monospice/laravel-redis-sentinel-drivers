@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
@@ -38,7 +38,7 @@ class RedisSentinelServiceProviderTest extends TestCase
     {
         $this->app = ApplicationFactory::make();
 
-        $this->app->config->set(require(__DIR__ . '/stubs/config.php'));
+        $this->app->config->set(require(__DIR__ . '/../stubs/config.php'));
 
         $this->provider = new RedisSentinelServiceProvider($this->app);
     }

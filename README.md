@@ -144,6 +144,10 @@ This example configures the package [through the environment][s-env-config]. It
 the configurable environment variables. Optionally, enable the [`RedisSentinel`
 facade][s-facade].
 
+For those that need a quick development Sentinel server cluster, try the
+[*start-cluster.sh*][s-integration-tests] script included with the package's
+testing files.
+
 Configuration
 -------------
 
@@ -661,14 +665,73 @@ Testing
 -------
 
 This package includes a PHPUnit test suite with unit tests for the package's
-classes. This package does not perform functional/integration tests against
-running Redis or Sentinel servers because Predis and Laravel both contain full
-test suites, and because the package code simply wraps these libraries. We may
-add these types of tests in the future if needed.
+classes and an integration test suite for Sentinel-specific functionality and
+known issues. These tests do not verify every Redis command because Predis and
+Laravel both contain full test suites themselves, and because the package code
+simply wraps these libraries.
 
+```shell
+$ phpunit --testsuite unit
+$ phpunit --testsuite integration
 ```
-$ phpunit
+
+The unit tests do not require live Redis servers. Read the next section for
+integration testing environment suggestions.
+
+**Note:** Composer does not download this package's testing files with a normal
+installation. We need to clone the package repository directly or install it
+with the `--prefer-source` option.
+
+### Integration Tests
+
+This package's integration test suite validates Sentinel- and Redis-specific
+functionality against real servers. These tests require at least one Sentinel
+server that monitors a Redis master. Additionally, at least one replica should
+synchronize with the master for optimal test coverage. Developers may supply
+their own servers or start an environment using the package's tools described
+below.
+
+To customize the Sentinel connection settings used by the integration tests,
+copy *phpunit.xml.dist* to *phpunit.xml* and change the constants defined in
+the `<php>...</php>` block.
+
+We can run the [*start-cluster.sh*](start-cluster.sh) script provided in the
+project's root directory to spin up Redis and Sentinel servers for a testing
+environment. Read the script help page for usage information.
+
+```shell
+$ ./start-cluster.sh help
 ```
+
+Docker users may wish to use the script to start testing servers in a container:
+
+```shell
+$ docker run --name redis-sentinel \
+    -v "$(pwd):/project" \
+    -w /project \
+    -u "$(id -u):$(id -g)" \
+    -e BIND_ADDRESS=0.0.0.0 \
+    -e SENTINEL_PORTS='26379-26381' \
+    -e REDIS_GROUP_1='service1 6379-6381' \
+    -e REDIS_GROUP_2='service2 6382-6384' \
+    -e LOGGING=yes \
+    -p 6379-6384:6379-6384 \
+    -p 26379-26381:26379-26381 \
+    --entrypoint start-cluster.sh \
+    redis:alpine
+```
+
+The package provides a [Compose file](docker-compose.yml) with the same options
+for running tests:
+
+```shell
+$ export CONTAINER_USER_ID="$(id -u):$(id -g)"
+$ docker-compose up -d cluster
+$ docker-compose run --rm tests [--testsuite ...]
+```
+
+Developers can also customize the Compose file by copying *docker-compose.yml*
+to *docker-compose.override.yml*.
 
 License
 -------
@@ -986,6 +1049,7 @@ Sentinel Documentation][sentinel].
 [s-env-config-examples]: #environment-based-configuration-examples
 [s-facade]: #executing-redis-commands-redissentinel-facade
 [s-hybrid-config]: #hybrid-configuration
+[s-integration-tests]: #integration-tests
 [s-multi-sentinel-example]: #multi-sentinel-connection-configuration
 [s-multi-service-example]: #multi-service-connection-configuration
 [s-multiple-hosts]: #specifying-multiple-hosts

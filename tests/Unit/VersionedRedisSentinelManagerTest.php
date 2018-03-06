@@ -1,13 +1,13 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Closure;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\RedisManager;
 use InvalidArgumentException;
 use Monospice\LaravelRedisSentinel\Contracts\Factory as RedisSentinelFactory;
-use Monospice\LaravelRedisSentinel\Manager;
+use Monospice\LaravelRedisSentinel\Manager\VersionedRedisSentinelManager;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
 use PHPUnit_Framework_TestCase as TestCase;
 use Predis\Connection\Aggregate\SentinelReplication;
@@ -35,19 +35,19 @@ class VersionedRedisSentinelManagerTest extends TestCase
      */
     public function setUp()
     {
-        $config = require(__DIR__ . '/stubs/config.php');
+        $config = require(__DIR__ . '/../stubs/config.php');
         $config = $config['database']['redis-sentinel'];
 
-        $class = $this->getVersionedRedisSentinelManagerClass();
+        $version = ApplicationFactory::getVersionedRedisSentinelManagerClass();
 
-        $this->managerClass = $class;
-        $this->manager = new $class('predis', $config);
+        $this->managerClass = $version;
+        $this->manager = new $version('predis', $config);
     }
 
     public function testIsInitializable()
     {
         $this->assertInstanceOf(
-            Manager\VersionedRedisSentinelManager::class,
+            VersionedRedisSentinelManager::class,
             $this->manager
         );
     }
@@ -69,7 +69,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
 
     public function testCreatesSentinelPredisClientsForEachConnection()
     {
-        $client1 = $this->manager->connection('connection1');
+        $client1 = $this->manager->connection('default');
         $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
@@ -87,7 +87,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
 
     public function testSetsSentinelConnectionOptionsFromConfig()
     {
-        $client1 = $this->manager->connection('connection1');
+        $client1 = $this->manager->connection('default');
         $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
@@ -104,7 +104,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
 
     public function testCreatesSingleClientsWithSharedConfig()
     {
-        $client1 = $this->manager->connection('connection1');
+        $client1 = $this->manager->connection('default');
         $client2 = $this->manager->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
@@ -117,7 +117,7 @@ class VersionedRedisSentinelManagerTest extends TestCase
 
     public function testCreatesSingleClientsWithIndividualConfig()
     {
-        $client1 = $this->manager->connection('connection1');
+        $client1 = $this->manager->connection('default');
         $client2 = $this->manager->connection('connection2');
 
         $this->assertEquals('mymaster', $client1->getOptions()->service);
@@ -147,29 +147,5 @@ class VersionedRedisSentinelManagerTest extends TestCase
         ]);
 
         $manager->connection('test_connection');
-    }
-
-    /**
-     * Get the fully-qualified class name of the RedisSentinelManager class
-     * for the current version of Laravel or Lumen under test.
-     *
-     * @return string The class name of the appropriate RedisSentinelManager
-     * with its namespace
-     */
-    protected function getVersionedRedisSentinelManagerClass()
-    {
-        $appVersion = ApplicationFactory::getApplicationVersion();
-
-        if (ApplicationFactory::isLumen()) {
-            $frameworkVersion = '5.4';
-        } else {
-            $frameworkVersion = '5.4.20';
-        }
-
-        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
-            return Manager\Laravel540RedisSentinelManager::class;
-        }
-
-        return Manager\Laravel5420RedisSentinelManager::class;
     }
 }

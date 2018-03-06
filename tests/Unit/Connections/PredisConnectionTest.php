@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests\Connections;
+namespace Monospice\LaravelRedisSentinel\Tests\Connections\Unit;
 
 use BadMethodCallException;
 use Illuminate\Redis\Connections\Connection;

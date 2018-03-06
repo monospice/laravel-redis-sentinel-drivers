@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\Connections\Connection;
