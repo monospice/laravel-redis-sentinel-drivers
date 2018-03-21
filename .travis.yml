@@ -6,7 +6,6 @@ php:
   - 7.0
   - 7.1
   - 7.2
-  - hhvm
 
 env:
   - LARAVEL_VERSION=">=5.4.0 <5.4.20"
@@ -30,14 +29,6 @@ matrix:
     - php: 7.0
       env: LARAVEL_VERSION="5.6.*"
     - php: 7.0
-      env: LUMEN_VERSION="5.6.*"
-    - php: hhvm
-      env: LARAVEL_VERSION="5.5.*"
-    - php: hhvm
-      env: LUMEN_VERSION="5.5.*"
-    - php: hhvm
-      env: LARAVEL_VERSION="5.6.*"
-    - php: hhvm
       env: LUMEN_VERSION="5.6.*"
 
 before_install:
