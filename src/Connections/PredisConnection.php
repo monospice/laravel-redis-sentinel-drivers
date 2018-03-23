@@ -216,6 +216,9 @@ class PredisConnection extends LaravelPredisConnection
      * @param callable $callback The operation to execute.
      *
      * @return mixed The result of the first successful attempt.
+     *
+     * @throws CommunicationException After exhausting the allowed number of
+     * attempts to reconnect.
      */
     protected function retryOnFailure(callable $callback)
     {
@@ -275,6 +278,9 @@ class PredisConnection extends LaravelPredisConnection
      * if the connection does not include any slaves.
      *
      * @return Client The client instance for the selected slave.
+     *
+     * @throws RuntimeException When the client cannot reach any replicas
+     * (and the master if $fallbackToMaster is TRUE).
      */
     protected function getRandomSlave($fallbackToMaster = true)
     {
