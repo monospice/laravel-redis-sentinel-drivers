@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Redis\Database as RedisDatabase;
@@ -12,7 +12,7 @@ use PHPUnit_Framework_TestCase as TestCase;
 class RedisSentinelServiceProviderTest extends TestCase
 {
     /**
-     * An instance of the Laravel application container
+     * An instance of the Laravel or Lumen application container
      *
      * @var \Illuminate\Contracts\Container\Container
      */
@@ -34,7 +34,7 @@ class RedisSentinelServiceProviderTest extends TestCase
     {
         $this->app = ApplicationFactory::make();
 
-        $this->app->config->set(require(__DIR__ . '/stubs/config.php'));
+        $this->app->config->set(require(__DIR__ . '/../stubs/config.php'));
 
         $this->provider = new RedisSentinelServiceProvider($this->app);
     }

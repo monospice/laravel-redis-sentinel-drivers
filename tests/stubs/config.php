@@ -13,7 +13,7 @@ return [
             'driver' => 'redis-sentinel',
         ],
         'redis-sentinel' => [
-            'connection1' => [
+            'default' => [
                 [
                     'host' => 'localhost',
                     'port' => 26379,
@@ -49,7 +49,7 @@ return [
         'connections' => [
             'redis-sentinel' => [
                 'driver' => 'redis-sentinel',
-                'connection' => 'connection1',
+                'connection' => 'default',
             ],
         ],
     ],
@@ -59,7 +59,7 @@ return [
         'stores' => [
             'redis-sentinel' => [
                 'driver' => 'redis-sentinel',
-                'connection' => 'connection1',
+                'connection' => 'default',
             ],
         ],
     ],
@@ -69,7 +69,7 @@ return [
         'connections' => [
             'redis-sentinel' => [
                 'driver' => 'redis-sentinel',
-                'connection' => 'connection1',
+                'connection' => 'default',
                 'queue' => 'default',
                 'expire' => 60,
             ],
@@ -79,7 +79,8 @@ return [
     // Represents a subset of config/session.php
     'session' => [
         'driver' => 'redis-sentinel',
-        'connection' => 'connection1',
+        'connection' => 'default',
+        'lifetime' => 120,
     ],
 
 ];

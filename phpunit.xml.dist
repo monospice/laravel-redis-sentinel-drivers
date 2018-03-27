@@ -12,8 +12,11 @@
     stopOnFailure="false">
 
     <testsuites>
-        <testsuite name="Example">
-            <directory>tests</directory>
+        <testsuite name="unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="integration">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
 
@@ -23,6 +26,17 @@
         </whitelist>
     </filter>
 
+    <php>
+        <!-- Integration test configuration: -->
+        <const name="TEST_REDIS_SENTINEL_HOST"
+            value="127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381"/>
+        <const name="TEST_REDIS_SENTINEL_SERVICE" value="service1"/>
+        <const name="TEST_REDIS_DATABASE" value="15"/>
+        <const name="TEST_MAX_CONNECTION_TIMEOUT" value="5.0"/>
+        <const name="TEST_MIN_CONNECTION_TIMEOUT" value="0.1"/>
+    </php>
+
+    <!--
     <logging>
         <log type="tap" target="build/report.tap"/>
         <log type="junit" target="build/report.junit.xml"/>
@@ -30,4 +44,5 @@
         <log type="coverage-text" target="build/coverage.txt"/>
         <log type="coverage-clover" target="build/clover.xml"/>
     </logging>
+    -->
 </phpunit>

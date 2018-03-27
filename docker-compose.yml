@@ -1,0 +1,28 @@
+version: "3"
+
+services:
+
+  cluster:
+    image: redis:alpine
+    entrypoint: ./start-cluster.sh
+    working_dir: /project
+    user: "${CONTAINER_USER_ID:-root:root}"
+    environment:
+      BIND_ADDRESS: "0.0.0.0"
+      SENTINEL_PORTS: "26379-26381"
+      REDIS_GROUP_1: "service1 6379-6381"
+      REDIS_GROUP_2: "service2 6382-6384"
+      LOGGING: "yes"
+    ports:
+      - "6379-6384:6379-6384"
+      - "26379-26381:26379-26381"
+    volumes:
+      - ./:/project
+
+  tests:
+    image: phpunit/phpunit:latest
+    entrypoint: vendor/bin/phpunit --colors=always
+    network_mode: host
+    user: "${CONTAINER_USER_ID:-root:root}"
+    volumes:
+      - ./:/app

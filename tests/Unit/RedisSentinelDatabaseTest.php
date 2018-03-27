@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
 use Closure;
 use Monospice\LaravelRedisSentinel\RedisSentinelDatabase;
@@ -23,30 +23,30 @@ class RedisSentinelDatabaseTest extends TestCase
      */
     public function setUp()
     {
-        $config = require(__DIR__ . '/stubs/config.php');
+        $config = require(__DIR__ . '/../stubs/config.php');
         $config = $config['database']['redis-sentinel'];
 
-        $this->database = new RedisSentinelDatabase($config);
+        $this->subject = new RedisSentinelDatabase($config);
     }
 
     public function testIsInitializable()
     {
         $class = 'Monospice\LaravelRedisSentinel\RedisSentinelDatabase';
 
-        $this->assertInstanceOf($class, $this->database);
+        $this->assertInstanceOf($class, $this->subject);
     }
 
     public function testExtendsRedisDatabaseForSwapability()
     {
         $extends = 'Illuminate\Redis\Database';
 
-        $this->assertInstanceOf($extends, $this->database);
+        $this->assertInstanceOf($extends, $this->subject);
     }
 
     public function testCreatesSentinelPredisClientsForEachConnection()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->subject->connection('default');
+        $client2 = $this->subject->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $options = $client->getOptions();
@@ -63,8 +63,8 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testSetsSentinelConnectionOptionsFromConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->subject->connection('default');
+        $client2 = $this->subject->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $connection = $client1->getConnection();
@@ -80,8 +80,8 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testCreatesSingleClientsWithSharedConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->subject->connection('default');
+        $client2 = $this->subject->connection('connection2');
 
         foreach ([ $client1, $client2 ] as $client) {
             $expected = [ 'password' => 'secret', 'database' => 0 ];
@@ -93,8 +93,8 @@ class RedisSentinelDatabaseTest extends TestCase
 
     public function testCreatesSingleClientsWithIndividualConfig()
     {
-        $client1 = $this->database->connection('connection1');
-        $client2 = $this->database->connection('connection2');
+        $client1 = $this->subject->connection('default');
+        $client2 = $this->subject->connection('connection2');
 
         $this->assertEquals('mymaster', $client1->getOptions()->service);
         $this->assertEquals('another-master', $client2->getOptions()->service);

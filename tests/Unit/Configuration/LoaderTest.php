@@ -1,6 +1,6 @@
 <?php
 
-namespace Monospice\LaravelRedisSentinel\Tests\Configuration;
+namespace Monospice\LaravelRedisSentinel\Tests\Unit\Configuration;
 
 use Monospice\LaravelRedisSentinel\Configuration\Loader;
 use Monospice\LaravelRedisSentinel\Tests\Support\ApplicationFactory;
@@ -274,7 +274,7 @@ class LoaderTest extends TestCase
         $this->config->set('database.redis.driver', 'redis-sentinel');
         $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi());
 
-        // Previous versios of the package looked for the value 'sentinel':
+        // Previous versions of the package looked for the value 'sentinel':
         $this->config->set('database.redis.driver', 'sentinel');
         $this->assertTrue($this->loader->shouldOverrideLaravelRedisApi());
 

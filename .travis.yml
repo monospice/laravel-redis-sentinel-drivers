@@ -1,5 +1,6 @@
 language: php
 dist: trusty
+sudo: false
 
 php:
     - 5.4
@@ -7,14 +8,15 @@ php:
     - 5.6
     - 7.0
     - 7.1
+    - 7.2
     - hhvm
 
 env:
-    - LARAVEL_VERSION=5.0.*
+    - LARAVEL_VERSION=5.0.* NO_BROADCAST=1
     - LARAVEL_VERSION=5.1.*
     - LARAVEL_VERSION=5.2.*
     - LARAVEL_VERSION=5.3.*
-    - LUMEN_VERSION=5.0.*
+    - LUMEN_VERSION=5.0.* NO_BROADCAST=1
     - LUMEN_VERSION=5.1.*
     - LUMEN_VERSION=5.2.*
     - LUMEN_VERSION=5.3.*
@@ -38,16 +40,22 @@ matrix:
         - php: 5.5
           env: LUMEN_VERSION=5.3.*
         - php: 7.1
-          env: LARAVEL_VERSION=5.0.*
+          env: LARAVEL_VERSION=5.0.* NO_BROADCAST=1
         - php: 7.1
-          env: LUMEN_VERSION=5.0.*
+          env: LUMEN_VERSION=5.0.* NO_BROADCAST=1
+        - php: 7.2
+          env: LARAVEL_VERSION=5.0.* NO_BROADCAST=1
+        - php: 7.2
+          env: LUMEN_VERSION=5.0.* NO_BROADCAST=1
 
-before_script:
+before_install:
     - if [ -n "$LARAVEL_VERSION" ]; then composer remove --dev --no-update "laravel/lumen-framework"; fi
     - if [ -n "$LARAVEL_VERSION" ]; then composer require --no-update "laravel/framework:$LARAVEL_VERSION"; fi
     - if [ -n "$LUMEN_VERSION" ]; then composer remove --dev --no-update "laravel/framework"; fi
     - if [ -n "$LUMEN_VERSION" ]; then composer require --no-update "laravel/lumen-framework:$LUMEN_VERSION"; fi
-    - composer install --prefer-source --no-interaction
 
-script:
-    - vendor/bin/phpunit
+install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
+
+before_script: SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
+
+script: vendor/bin/phpunit --exclude-group ${LUMEN_VERSION:+laravel-only},${NO_BROADCAST:+broadcasting}

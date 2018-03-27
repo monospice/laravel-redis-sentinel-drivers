@@ -9,8 +9,19 @@ use Illuminate\Encryption\EncryptionServiceProvider;
 use Illuminate\Queue\QueueServiceProvider;
 use Illuminate\Redis\RedisServiceProvider;
 use Illuminate\Session\SessionServiceProvider;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Str;
 
+/**
+ * Bootstraps Laravel and Lumen application instances for the version of the
+ * framework installed for testing.
+ *
+ * @category Package
+ * @package  Monospice\LaravelRedisSentinel
+ * @author   Cy Rossignol <cy@rossignols.me>
+ * @license  See LICENSE file
+ * @link     https://github.com/monospice/laravel-redis-sentinel-drivers
+ */
 class ApplicationFactory
 {
     /**
@@ -69,6 +80,7 @@ class ApplicationFactory
 
         $app->config = new ConfigRepository();
 
+        Facade::setFacadeApplication($app);
         static::bootstrapEncryption($app);
 
         return $app;
