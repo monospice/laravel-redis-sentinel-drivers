@@ -2,11 +2,11 @@
 
 namespace Monospice\LaravelRedisSentinel;
 
+use Closure;
 use Illuminate\Redis\Database as RedisDatabase;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
+use Monospice\LaravelRedisSentinel\PredisConnection;
 use Monospice\SpicyIdentifiers\DynamicMethod;
-use Predis\Client;
 
 /**
  * Enables Laravel's Redis database driver to accept configuration options for
@@ -16,7 +16,7 @@ use Predis\Client;
  * options for all of the Redis connections passed to the Predis client. This
  * prevents us from declaring separate parameters for individual Redis services
  * managed by Sentinel. For example, we may wish to connect to a separate Redis
- * Sentinel service cluster set, or use a separate Redis database, for caching
+ * Sentinel replication group, or use separate Redis databases for caching,
  * queues, and sessions. This wrapper class enables us to declare parameters
  * for each connection in the "redis-sentinel" block of the database
  * configuration which it will use to configure individual clients.
@@ -25,7 +25,7 @@ use Predis\Client;
  * @package  Monospice\LaravelRedisSentinel
  * @author   Cy Rossignol <cy@rossignols.me>
  * @license  See LICENSE file
- * @link     http://github.com/monospice/laravel-redis-sentinel-driver
+ * @link     https://github.com/monospice/laravel-redis-sentinel-drivers
  */
 class RedisSentinelDatabase extends RedisDatabase
 {
@@ -44,6 +44,45 @@ class RedisSentinelDatabase extends RedisDatabase
         'retry_limit',
         'update_sentinels',
     ];
+
+    /**
+     * Subscribe to a set of given channels for messages.
+     *
+     * @param array|string $channels   The names of the channels to subscribe to
+     * @param Closure      $callback   Executed for each message. Receives the
+     * message string in the first argument and the message channel as the
+     * second argument. Return FALSE to unsubscribe.
+     * @param string|null  $connection Name of the connection to subscribe with.
+     * @param string       $method     The subscription command ("subscribe" or
+     * "psubscribe").
+     *
+     * @return void
+     */
+    public function subscribe(
+        $channels,
+        Closure $callback,
+        $connection = null,
+        $method = 'subscribe'
+    ) {
+        $this->connection($connection)
+            ->createSubscription($channels, $callback, $method);
+    }
+
+    /**
+     * Subscribe to a set of given channels with wildcards.
+     *
+     * @param array|string $channels   The names of the channels to subscribe to
+     * @param Closure      $callback   Executed for each message. Receives the
+     * message string in the first argument and the message channel as the
+     * second argument. Return FALSE to unsubscribe.
+     * @param string|null  $connection Name of the connection to subscribe with.
+     *
+     * @return void
+     */
+    public function psubscribe($channels, Closure $callback, $connection = null)
+    {
+        $this->subscribe($channels, $callback, $connection, __FUNCTION__);
+    }
 
     /**
      * Create an array of single connection clients.
@@ -100,7 +139,7 @@ class RedisSentinelDatabase extends RedisDatabase
         // options array
         $clientOpts = array_diff_key($clientOpts, $sentinelKeys);
 
-        $client = new Client($server, $clientOpts);
+        $client = new PredisConnection($server, $clientOpts);
         $this->setSentinelConnectionOptions($client, $sentinelOpts);
 
         return $client;
@@ -117,15 +156,13 @@ class RedisSentinelDatabase extends RedisDatabase
      * @return void
      */
     protected function setSentinelConnectionOptions(
-        Client $client,
+        PredisConnection $client,
         array $sentinelOpts
     ) {
-        $connection = $client->getConnection();
-
         foreach ($sentinelOpts as $option => $value) {
             DynamicMethod::parseFromUnderscore($option)
                 ->prepend('set')
-                ->callOn($connection, [ $value ]);
+                ->callOn($client, [ $value ]);
         }
     }
 }
