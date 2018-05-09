@@ -20,11 +20,14 @@ erases stored session information as well.
 
 This package wraps the configuration of Laravel's broadcasting, cache, session,
 and queue APIs for Sentinel with the ability to set options for our Redis
-services independently. We configure the package separately from Laravel's
-standard Redis configuration so we can choose to use the Sentinel connections
-as needed by the environment. A developer may use a standalone Redis server in
-their local environment, while production environments operate a Redis Sentinel
-set of servers.
+services independently. It adds Sentinel support for [Laravel Horizon][s-horizon]
+and fixes other compatibility issues.
+
+We configure the package separately from Laravel's standard Redis configuration
+so we can choose to use the Sentinel connections as needed by the environment.
+A developer may use a standalone Redis server in their local environment, while
+production environments operate a Redis Sentinel set of servers.
+
 
 Contents
 --------
@@ -39,10 +42,13 @@ Contents
      - [Hybrid Configuration][s-hybrid-config]
  - [Override the Standard Redis API][s-override-redis-api]
  - [Executing Redis Commands (RedisSentinel Facade)][s-facade]
+ - [Other Sentinel Considerations][s-considerations]
+ - [Laravel Horizon][s-horizon]
  - [Testing](#testing)
  - [License](#license)
  - [Appendix: Environment Variables][s-appx-env-vars]
  - [Appendix: Configuration Examples][s-appx-examples]
+
 
 Requirements
 ------------
@@ -61,10 +67,11 @@ This Readme assumes prior knowledge of configuring [Redis][redis] for [Redis
 Sentinel][sentinel] and [using Redis with Laravel][laravel-redis-docs] or
 [Lumen][lumen-redis-docs].
 
+
 Installation
 ------------
 
-We're using Laravel, so we'll install through composer, of course!
+We're using Laravel, so we'll install through Composer, of course!
 
 #### For Laravel/Lumen 5.4 and above:
 
@@ -108,6 +115,7 @@ In Lumen, register the service provider in *bootstrap/app.php*:
 $app->register(Monospice\LaravelRedisSentinel\RedisSentinelServiceProvider::class);
 ```
 
+
 Quickstart (TL;DR)
 ------------------
 
@@ -143,6 +151,11 @@ This example configures the package [through the environment][s-env-config]. It
 the configurable environment variables. Optionally, enable the [`RedisSentinel`
 facade][s-facade].
 
+For those that need a quick development Sentinel server cluster, try the
+[*start-cluster.sh*][s-integration-tests] script included with the package's
+testing files.
+
+
 Configuration
 -------------
 
@@ -163,6 +176,7 @@ installation.
 
 The package continues to support advanced configuration through standard config
 files without requiring changes for existing projects.
+
 
 Environment-Based Configuration
 -------------------------------
@@ -260,6 +274,7 @@ file](config/redis-sentinel.php) or the [environment-based configuration
 examples][s-env-config-examples] to better understand how the package uses
 environment variables.
 
+
 Using Standard Configuration Files
 ----------------------------------
 
@@ -272,6 +287,7 @@ default environment-based configuration can provide.
 For this configuration method, we'll modify the following config files:
 
  - *config/database.php* - to define the Redis Sentinel connections
+ - *config/broadcasting.php* - to define the Redis Sentinel broadcaster
  - *config/cache.php* - to define a Redis Sentinel cache store
  - *config/session.php* - to set the Redis Sentinel connection for sessions
  - *config/queue.php* - to define a Redis Sentinel queue connection
@@ -295,7 +311,7 @@ remove the `'redis'` driver config block that ships with Laravel by default.
 
 **Note:** Laravel passes these configuration options to the [Predis][predis]
 client library, so we can include advanced configuration options here if
-needed. See the [Predis Documentation][predis-docs] for more information.
+needed. See the [Predis documentation][predis-docs] for more information.
 
 #### Basic Configuration
 
@@ -366,24 +382,23 @@ for a single connection. The default values are shown below:
     ...
 
     // The default amount of time (in seconds) the client waits before
-    // determining that a connection attempt to a Sentinel server failed
+    // determining that a connection attempt to a Sentinel server failed.
     'sentinel_timeout' => 0.100,
 
-    // The default number of attempts the client tries to contact a Sentinel
-    // server before it determines that it cannot reach all Sentinel servers
-    // in a quorum. A value of 0 instructs the client to throw an exception
-    // after the first failed attempt, while a value of -1 causes the client
-    // to continue to retry connections to Sentinel indefinitely
+    // The default number of attempts to retry a command when the client fails
+    // to connect to a Redis or Sentinel server. A value of 0 instructs the
+    // client to throw an exception after the first failed attempt, while a
+    // value of -1 causes the client to continue to retry commands indefinitely.
     'retry_limit' => 20,
 
-    // The default amount of time (in milliseconds) the client waits before
-    // attempting to contact another Sentinel server if the previous server did
-    // not respond
+    // The default amount of time (in milliseconds) that the client waits before
+    // attempting to contact another Sentinel server or retry a command if the
+    // previous server did not respond.
     'retry_wait' => 1000,
 
     // Instructs the client to query the first reachable Sentinel server for an
     // updated set of Sentinels each time the client needs to establish a
-    // connection with a Redis master or slave server
+    // connection with a Redis master or replica.
     'update_sentinels' => false,
 ],
 ```
@@ -477,6 +492,7 @@ If the application contains a specific connection in the `'redis-sentinel'`
 database configuration for the queue, replace `'connection' => 'default'` with
 its name.
 
+
 Using a Package Configuration File
 ----------------------------------
 
@@ -508,11 +524,12 @@ We can customize the package's [internal config file](config/redis-sentinel.php)
 by copying it into our project's *config/* directory  and changing the values
 as needed. Lumen users may need to create this directory if it doesn't exist.
 
-A custom package config file need only contain the top-level elements that
+A custom package config file needs only to contain the top-level elements that
 developer wishes to customize: in the code shown above, the custom config file
 only overrides the package's default configuration for Redis Sentinel
 connections, so the package will still automatically configure the broadcasting,
 cache, session, and queue services using environment variables.
+
 
 Hybrid Configuration
 --------------------
@@ -537,6 +554,7 @@ a custom package config file inherits the values from the package's default
 configuration that it does not explicitly declare, and the main application
 configuration receives the values from both of these that it does not provide
 in a standard config file.
+
 
 Override the Standard Redis API
 -------------------------------
@@ -582,6 +600,10 @@ service (`app('redis')`, etc) will operate using the Sentinel connections.
 This makes it easier for developers to use a standalone Redis server in their
 local environments and switch to a full Sentinel set of servers in production.
 
+**Note:** When using the package with [Laravel Horizon][s-horizon], this change
+will cause Horizon to run over a Sentinel connection as well.
+
+
 Executing Redis Commands (RedisSentinel Facade)
 -------------------------------------------------
 
@@ -625,18 +647,192 @@ In Lumen, add the alias to *bootstrap/app.php*:
 class_alias('Monospice\LaravelRedisSentinel\RedisSentinel', 'RedisSentinel');
 ```
 
+
+Other Sentinel Considerations
+-----------------------------
+
+The following sections describe some characteristics to keep in mind when
+working with Sentinel connections.
+
+### Read and Write Operations
+
+To spread load between available resources, the client attempts to execute read
+operations on Redis slave servers when initializing a connection. Commands that
+write data will always execute on the master server.
+
+### Transactions
+
+All commands in a transaction, even read-only commands, execute on the master
+Redis server. When it makes sense to do so, avoid calling read commands within
+a transaction to improve load-balancing.
+
+If a transaction aborts because of a connection failure, the package attempts
+to reconnect and retry the transaction until it exhausts the configured number
+of allowed attempts (`retry_limit`), or until the entire transaction succeeds.
+
+**Important:** Predis provides a specialized MULTI/EXEC abstraction that we can
+obtain by calling `transaction()` with no arguments. This API is *not*
+protected by Sentinel connection failure handling. For high-availability, use
+the Laravel API by passing a closure to `transaction()`.
+
+### Publish/Subscribe
+
+For PUB/SUB messaging, the client publishes messages to the master server. When
+subscribing, the package attempts to connect to a slave server first before
+falling-back to the master. Like with read operations, this helps to distribute
+the load away from the master because messages published to the master propagate
+to each of the slaves.
+
+Applications with long-running subscribers need to extend the timeout of the
+connection or disable it by setting `read_write_timeout` to `0`. Additionally,
+we also need to extend or disable the `timeout` configuration directive on the
+Redis servers that the application subscribes to.
+
+When a subscriber connection fails, the package will attempt to reconnect to
+another server and resume listening for messages. We may want to set the value
+of `retry_limit` to `-1` on connections with long-running subscribers so that
+the client continues to retry forever. Note that a subscriber may miss messages
+published to a channel while re-establishing the connection.
+
+**Important:** Predis provides a PUB/SUB consumer that we can obtain by calling
+`pubSubLoop()` with no arguments. This API is *not* protected by Sentinel
+connection failure handling. For high-availability, use the Laravel API by
+passing a closure to `subscribe()` or `psubscribe()`.
+
+
+Laravel Horizon
+---------------
+
+Versions 2.4.0 and greater of this package provide for the use of Sentinel
+connections with the [Laravel Horizon][laravel-horizon] queue management tool
+in compatible applications (Laravel 5.5+).
+
+After [installing Horizon][laravel-horizon-install-docs], we need to update
+some configuration settings in *config/horizon.php*:
+
+If needed, change `'use' => 'default'` to the name of the Sentinel connection
+to use for the Horizon backend as configured in *config/database.php*.
+
+**Important:** The standard `'redis'` connections array in *config/database.php*
+must contain an element with the same key as the Sentinel connection specified
+for the `'use'` directive or Horizon throws an exception. Currently, Horizon
+does not provide a way for this package to handle this behavior, but an
+(in-progress) pull request may eliminate this requirement in the future. This
+element can contain any value (but a matching Redis connection config seems
+most appropriate).
+
+Change the backend driver for Horizon's internal metadata to `'redis-sentinel'`
+by adding the following element to the top-level array:
+
+```php
+'driver' => env('HORIZON_DRIVER', 'redis');
+```
+
+...and assign the value of `redis-sentinel` to `HORIZON_DRIVER` in *.env*.
+
+
+Then, add an entry to the `'waits'` array for any Sentinel queues:
+
+```php
+'waits' => [
+    ...
+    'redis-sentinel:default' => 60,
+],
+```
+
+Next, change the connection driver to `redis-sentinel` for each of the queue
+workers that should use Sentinel connections in the `'environments'` block:
+
+```php
+...
+'supervisor-1' => [
+    'connection' => 'redis-sentinel',
+    ...
+],
+...
+```
+
+Horizon will now use the application's Redis Sentinel connections to monitor
+and process our queues.
+
+**Note:** If we already configured the package to [override Laravel's standard
+Redis API][s-override-redis-api] (by setting `REDIS_DRIVER` to `redis-sentinel`,
+for example), we don't need to change `HORIZON_DRIVER` to `'redis-sentinel'`.
+The package already routes all Redis operations through Sentinel connections.
+
+
 Testing
 -------
 
 This package includes a PHPUnit test suite with unit tests for the package's
-classes. This package does not perform functional/integration tests against
-running Redis or Sentinel servers because Predis and Laravel both contain full
-test suites, and because the package code simply wraps these libraries. We may
-add these types of tests in the future if needed.
+classes and an integration test suite for Sentinel-specific functionality and
+compatibility fixes. These tests do not verify every Redis command because
+Predis and Laravel both contain full test suites themselves, and because the
+package code simply wraps these libraries.
 
+```shell
+$ phpunit --testsuite unit
+$ phpunit --testsuite integration
 ```
-$ phpunit
+
+The unit tests do not require live Redis servers. Read the next section for
+integration testing environment suggestions.
+
+**Note:** Composer does not download this package's testing files with a normal
+installation. We need to clone the package repository directly or install it
+with the `--prefer-source` option.
+
+### Integration Tests
+
+This package's integration test suite validates Sentinel- and Redis-specific
+functionality against real servers. These tests require at least one Sentinel
+server that monitors a Redis master. Additionally, at least one replica should
+synchronize with the master for optimal test coverage. Developers may supply
+their own servers or start an environment using the package's tools described
+below.
+
+To customize the Sentinel connection settings used by the integration tests,
+copy *phpunit.xml.dist* to *phpunit.xml* and change the constants defined in
+the `<php>...</php>` block.
+
+We can run the [*start-cluster.sh*](start-cluster.sh) script provided in the
+project's root directory to spin up Redis and Sentinel servers for a testing
+environment. Read the script help page for usage information.
+
+```shell
+$ ./start-cluster.sh help
 ```
+
+Docker users may wish to use the script to start testing servers in a container:
+
+```shell
+$ docker run --name redis-sentinel \
+    -v "$(pwd):/project" \
+    -w /project \
+    -u "$(id -u):$(id -g)" \
+    -e BIND_ADDRESS=0.0.0.0 \
+    -e SENTINEL_PORTS='26379-26381' \
+    -e REDIS_GROUP_1='service1 6379-6381' \
+    -e REDIS_GROUP_2='service2 6382-6384' \
+    -e LOGGING=yes \
+    -p 6379-6384:6379-6384 \
+    -p 26379-26381:26379-26381 \
+    --entrypoint start-cluster.sh \
+    redis:alpine
+```
+
+The package provides a [Compose file](docker-compose.yml) with the same options
+for running tests:
+
+```shell
+$ export CONTAINER_USER_ID="$(id -u):$(id -g)"
+$ docker-compose up -d cluster
+$ docker-compose run --rm tests [--testsuite ...]
+```
+
+Developers can also customize the Compose file by copying *docker-compose.yml*
+to *docker-compose.override.yml*.
+
 
 License
 -------
@@ -645,6 +841,7 @@ The MIT License (MIT). Please see the [LICENSE File](LICENSE) for more
 information.
 
 -------------------------------------------------------------------------------
+
 
 Appendix: Environment Variables
 -------------------------------
@@ -769,6 +966,7 @@ The name of the Sentinel connection to select for storing application sessions
 when `SESSION_DRIVER` equals `redis-sentinel`. It defaults to the package's
 internal, auto-configured *session* connection when unset unless the
 application configuration already contains a value for `session.connection`.
+
 
 Appendix: Configuration Examples
 --------------------------------
@@ -948,11 +1146,14 @@ Sentinel Documentation][sentinel].
 
 [s-appx-env-vars]: #appendix-environment-variables
 [s-appx-examples]: #appendix-configuration-examples
+[s-considerations]: #other-sentinel-considerations
 [s-dev-vs-prod-example]: #development-vs-production
 [s-env-config]: #environment-based-configuration
 [s-env-config-examples]: #environment-based-configuration-examples
 [s-facade]: #executing-redis-commands-redissentinel-facade
+[s-horizon]: #laravel-horizon
 [s-hybrid-config]: #hybrid-configuration
+[s-integration-tests]: #integration-tests
 [s-multi-sentinel-example]: #multi-sentinel-connection-configuration
 [s-multi-service-example]: #multi-service-connection-configuration
 [s-multiple-hosts]: #specifying-multiple-hosts
@@ -963,6 +1164,9 @@ Sentinel Documentation][sentinel].
 [s-standard-config-examples]: #configuration-file-examples
 
 [laravel-env-docs]: https://laravel.com/docs/configuration#environment-configuration
+[laravel-horizon]: https://horizon.laravel.com
+[laravel-horizon-docs]: https://laravel.com/docs/horizon
+[laravel-horizon-install-docs]: https://laravel.com/docs/horizon#installation
 [laravel-package-discovery-docs]: https://laravel.com/docs/packages#package-discovery
 [laravel-redis-api-docs]: https://laravel.com/docs/redis#interacting-with-redis
 [laravel-redis-docs]: https://laravel.com/docs/redis
