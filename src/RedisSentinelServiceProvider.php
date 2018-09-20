@@ -84,7 +84,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
     protected function registerServices()
     {
         $this->app->singleton('redis-sentinel', function () {
-            return VersionedManagerFactory::make($this->config);
+            return VersionedManagerFactory::make($this->app, $this->config);
         });
 
         $this->app->singleton('redis-sentinel.manager', function ($app) {

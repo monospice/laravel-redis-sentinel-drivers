@@ -24,10 +24,7 @@ class RedisSentinelManagerTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $version = ApplicationFactory::getVersionedRedisSentinelManagerClass();
-        $versionedManager = new $version('predis', $this->config);
-
-        $this->subject = new RedisSentinelManager($versionedManager);
+        $this->subject = $this->makeSubject('predis', $this->config);
     }
 
     public function testExecutesRedisCommands()
@@ -49,5 +46,29 @@ class RedisSentinelManagerTest extends IntegrationTestCase
         $this->assertRedisResponseOk($response);
         $this->assertRedisKeyEquals('test-key', 'test value');
         $this->assertEquals('test value', $connection->get('test-key'));
+    }
+
+    /**
+     * Create an instance of the subject under test.
+     *
+     * @param string $client The name of the Redis client implementation.
+     * @param array  $config A set of connection manager config values.
+     *
+     * @return VersionedRedisSentinelManager The correct version of the
+     * Sentinel connection manager for the current version of Laravel.
+     */
+    protected function makeSubject($client, array $config)
+    {
+        $class = ApplicationFactory::getVersionedRedisSentinelManagerClass();
+        $version = ApplicationFactory::getApplicationVersion();
+
+        if (version_compare($version, '5.7', 'lt')) {
+            return new RedisSentinelManager(new $class($client, $config));
+        }
+
+        // Laravel 5.7 introduced the app as the first parameter:
+        return new RedisSentinelManager(
+            new $class(ApplicationFactory::make(), $client, $config)
+        );
     }
 }

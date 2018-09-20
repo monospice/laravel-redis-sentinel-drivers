@@ -244,16 +244,6 @@ class Loader
     }
 
     /**
-     * Get the current Laravel or Lumen application.
-     *
-     * @return \Illuminate\Contracts\Foundation\Application
-     */
-    public function getApplication()
-    {
-        return $this->app;
-    }
-
-    /**
      * Fetch the specified application configuration value.
      *
      * This helper method enables the package's service providers to get config

@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Manager;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Arr;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
 use Monospice\LaravelRedisSentinel\RedisSentinelManager;
@@ -19,6 +20,14 @@ use Monospice\LaravelRedisSentinel\RedisSentinelManager;
 class VersionedManagerFactory
 {
     /**
+     * The current application instance that Laravel's RedisManager depends on
+     * in version 5.7+.
+     *
+     * @var Container
+     */
+    protected $app;
+
+    /**
      * Detects the application version and provides configuration values.
      *
      * @var ConfigurationLoader
@@ -28,26 +37,31 @@ class VersionedManagerFactory
     /**
      * Create a factory using the provided configuration.
      *
+     * @param Container           $app    The current application instance that
+     * Laravel's RedisManager depends on in version 5.7+.
      * @param ConfigurationLoader $config Detects the application version and
      * provides configuration values.
      */
-    public function __construct(ConfigurationLoader $config)
+    public function __construct(Container $app, ConfigurationLoader $config)
     {
+        $this->app = $app;
         $this->config = $config;
     }
 
     /**
      * Create an instance of the package's core Redis Sentinel service.
      *
+     * @param Container           $app    The current application instance that
+     * Laravel's RedisManager depends on in version 5.7+.
      * @param ConfigurationLoader $config Detects the application version and
      * provides configuration values.
      *
      * @return \Monospice\LaravelRedisSentinel\Contracts\Factory A configured
      * Redis Sentinel connection manager.
      */
-    public static function make(ConfigurationLoader $config)
+    public static function make(Container $app, ConfigurationLoader $config)
     {
-        return (new static($config))->makeInstance();
+        return (new static($app, $config))->makeInstance();
     }
 
     /**
@@ -59,15 +73,15 @@ class VersionedManagerFactory
     public function makeInstance()
     {
         $class = $this->getVersionedRedisSentinelManagerClass();
-        $app = $this->config->getApplication();
         $config = $this->config->get('database.redis-sentinel', [ ]);
         $driver = Arr::pull($config, 'client', 'predis');
 
-        if (version_compare($this->config->getApplicationVersion(), '5.6') <= 0) {
+        // Laravel 5.7 introduced the app as the first parameter:
+        if ($this->appVersionLessThan('5.7')) {
             return new RedisSentinelManager(new $class($driver, $config));
         }
 
-        return new RedisSentinelManager(new $class($app, $driver, $config));
+        return new RedisSentinelManager(new $class($this->app, $driver, $config));
 
     }
 
@@ -80,18 +94,32 @@ class VersionedManagerFactory
      */
     protected function getVersionedRedisSentinelManagerClass()
     {
-        $appVersion = $this->config->getApplicationVersion();
-
         if ($this->config->isLumen) {
             $frameworkVersion = '5.4';
         } else {
             $frameworkVersion = '5.4.20';
         }
 
-        if (version_compare($appVersion, $frameworkVersion, 'lt')) {
+        if ($this->appVersionLessThan($frameworkVersion)) {
             return Laravel540RedisSentinelManager::class;
         }
 
         return Laravel5420RedisSentinelManager::class;
+    }
+
+    /**
+     * Determine whether the current Laravel framework version is less than the
+     * specified version.
+     *
+     * @param string $version The version to compare to the current version.
+     *
+     * @return bool TRUE current framework version is less than the specified
+     * version.
+     */
+    protected function appVersionLessThan($version)
+    {
+        $appVersion = $this->config->getApplicationVersion();
+
+        return version_compare($appVersion, $version, 'lt');
     }
 }

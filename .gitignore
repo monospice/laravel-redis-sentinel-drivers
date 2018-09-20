@@ -8,4 +8,3 @@ docker-compose.override.yml
 phpcs.xml
 phpspec.yml
 phpunit.xml
-/.idea

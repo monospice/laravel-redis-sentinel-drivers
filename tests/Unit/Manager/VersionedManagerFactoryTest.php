@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests\Unit\Manager;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use Monospice\LaravelRedisSentinel\Configuration\Loader as ConfigurationLoader;
@@ -41,8 +42,10 @@ class VersionedManagerFactoryTest extends TestCase
         $this->configLoaderMock->shouldReceive('get')
             ->andReturn([ ])->byDefault();
 
-
-        $this->subject = new VersionedManagerFactory($this->configLoaderMock);
+        $this->subject = new VersionedManagerFactory(
+            Mockery::mock(Container::class),
+            $this->configLoaderMock
+        );
     }
 
     /**
@@ -83,7 +86,8 @@ class VersionedManagerFactoryTest extends TestCase
             ->with('database.redis-sentinel', [ ])
             ->andReturn([ 'connection' => [ ] ]);
 
-        $manager = VersionedManagerFactory::make($this->configLoaderMock);
+        $app = Mockery::mock(Container::class);
+        $manager = VersionedManagerFactory::make($app, $this->configLoaderMock);
         $connection = $manager->connection('connection');
 
         $this->assertInstanceOf(ManagerContract::class, $manager);

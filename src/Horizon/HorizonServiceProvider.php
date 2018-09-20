@@ -98,7 +98,7 @@ class HorizonServiceProvider extends ServiceProvider
     protected function registerServices()
     {
         $this->app->bindIf('redis-sentinel', function ($app) {
-            return VersionedManagerFactory::make($this->config);
+            return VersionedManagerFactory::make($this->app, $this->config);
         }, true);
 
         $this->app->bindIf('redis-sentinel.manager', function ($app) {

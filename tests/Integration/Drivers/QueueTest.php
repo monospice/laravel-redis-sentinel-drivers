@@ -46,7 +46,7 @@ class QueueTest extends IntegrationTestCase
         $app->config->set('horizon.driver', 'default');
         $app->register(RedisSentinelServiceProvider::class);
 
-        if (! ApplicationFactory::isLumen()) {
+        if (ApplicationFactory::supportsBoot()) {
             $app->boot();
         }
 

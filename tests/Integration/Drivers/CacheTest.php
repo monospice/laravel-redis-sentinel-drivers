@@ -37,7 +37,7 @@ class CacheTest extends IntegrationTestCase
         $app->config->set('database.redis-sentinel', $this->config);
         $app->register(RedisSentinelServiceProvider::class);
 
-        if (! ApplicationFactory::isLumen()) {
+        if (ApplicationFactory::supportsBoot()) {
             $app->boot();
         }
 

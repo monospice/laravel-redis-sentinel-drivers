@@ -185,6 +185,17 @@ class ApplicationFactory
     }
 
     /**
+     * Determine whether the application supports the boot() method.
+     *
+     * @return bool True if any supported Laravel version OR Lumen 5.7+.
+     */
+    public static function supportsBoot()
+    {
+        return ! static::isLumen()
+            || version_compare(static::getApplicationVersion(), '5.7', 'ge');
+    }
+
+    /**
      * Get the fully-qualified class name of the RedisSentinelManager class
      * for the current version of Laravel or Lumen under test.
      *
