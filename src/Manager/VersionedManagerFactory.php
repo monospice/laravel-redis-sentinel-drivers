@@ -59,10 +59,16 @@ class VersionedManagerFactory
     public function makeInstance()
     {
         $class = $this->getVersionedRedisSentinelManagerClass();
+        $app = $this->config->getApplication();
         $config = $this->config->get('database.redis-sentinel', [ ]);
         $driver = Arr::pull($config, 'client', 'predis');
 
-        return new RedisSentinelManager(new $class($driver, $config));
+        if (version_compare($this->config->getApplicationVersion(), '5.6') <= 0) {
+            return new RedisSentinelManager(new $class($driver, $config));
+        }
+
+        return new RedisSentinelManager(new $class($app, $driver, $config));
+
     }
 
     /**
