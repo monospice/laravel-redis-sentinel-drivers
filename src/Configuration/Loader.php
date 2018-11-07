@@ -122,6 +122,14 @@ class Loader
      */
     public $shouldIntegrateHorizon;
 
+
+    /**
+     * Indicates whether this should auto-boot the provider immediately.
+     *
+     * @var bool
+     */
+    public $shouldAutoBoot;
+
     /**
      * The current Laravel or Lumen application instance that provides context
      * and services used to load the appropriate configuration.
@@ -203,6 +211,8 @@ class Loader
 
         $this->shouldIntegrateHorizon = $this->horizonAvailable
             && $this->config->get('horizon.driver') === 'redis-sentinel';
+
+        $this->shouldAutoBoot = $this->config->get('redis-sentinel.auto_boot', false);
     }
 
     /**

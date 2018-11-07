@@ -537,6 +537,18 @@ class LoaderTest extends TestCase
         }
     }
 
+    public function testSetsAutoBootConfiguration()
+    {
+        // Test that it sets the boot value correctly
+        $this->config->set('redis-sentinel.auto_boot', false);
+        $this->loader->loadConfiguration();
+        $this->assertFalse($this->loader->shouldAutoBoot);
+
+        $this->config->set('redis-sentinel.auto_boot', true);
+        $this->loader->loadConfiguration();
+        $this->assertTrue($this->loader->shouldAutoBoot);
+    }
+
     public function testNormalizesSentinelConnectionHosts()
     {
         $this->startTestWithConfiguredApplication();

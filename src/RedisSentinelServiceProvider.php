@@ -27,6 +27,13 @@ use Monospice\LaravelRedisSentinel\Manager\VersionedManagerFactory;
 class RedisSentinelServiceProvider extends ServiceProvider
 {
     /**
+     * Records whether this provider has already been booted (eg. via auto-boot)
+     *
+     * @var boolean
+     */
+    private $isBooted;
+
+    /**
      * Loads the package's configuration and provides configuration values.
      *
      * @var ConfigurationLoader
@@ -41,6 +48,11 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Don't double boot the provider
+        if ($this->isBooted) {
+            return;
+        }
+
         $this->bootComponentDrivers();
 
         // If we want Laravel's Redis API to use Sentinel, we'll remove the
@@ -54,6 +66,8 @@ class RedisSentinelServiceProvider extends ServiceProvider
             $horizon->register();
             $horizon->boot();
         }
+
+        $this->isBooted = true;
     }
 
     /**
@@ -73,6 +87,12 @@ class RedisSentinelServiceProvider extends ServiceProvider
         // service:
         if ($this->config->shouldOverrideLaravelRedisApi) {
             $this->registerOverrides();
+        }
+
+        // We may need to boot this provider immediately to work around other
+        // providers calling Cache too early or Lumen 5.7 issues.
+        if ($this->config->shouldAutoBoot) {
+            $this->boot();
         }
     }
 

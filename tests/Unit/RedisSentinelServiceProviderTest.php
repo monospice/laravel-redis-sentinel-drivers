@@ -197,4 +197,22 @@ class RedisSentinelServiceProviderTest extends TestCase
             $this->assertNotNull($this->app->session->driver('redis-sentinel'));
         }
     }
+
+    public function testAutoBootOption()
+    {
+        $this->app->config->set('redis-sentinel.auto-boot', false);
+        $this->provider->register();
+
+        // It didn't auto boot
+        $this->assertNull($this->app->cache->store('redis-sentinel'));
+
+        $this->app->config->set('redis-sentinel.auto-boot', true);
+        $this->provider->register();
+
+        // It didn't auto boot
+        $this->assertNotNull($this->app->cache->store('redis-sentinel'));
+
+        $this->assertInstanceOf(RedisSentinelManager::class, $redisService);
+        $this->assertInstanceOf(RedisSentinelFactory::class, $redisService);
+    }
 }

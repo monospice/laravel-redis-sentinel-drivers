@@ -38,6 +38,7 @@ $port = env('REDIS_SENTINEL_PORT', env('REDIS_PORT', 26379));
 $password = env('REDIS_SENTINEL_PASSWORD', env('REDIS_PASSWORD', null));
 $database = env('REDIS_SENTINEL_DATABASE', env('REDIS_DATABASE', 0));
 $service = env('REDIS_SENTINEL_SERVICE', 'mymaster');
+$autoBoot = env('REDIS_SENTINEL_AUTO_BOOT', false);
 
 return [
 
@@ -69,6 +70,8 @@ return [
     'load_config' => true,
 
     'clean_config' => true,
+
+    'auto_boot' => $autoBoot,
 
     /*
     |--------------------------------------------------------------------------
