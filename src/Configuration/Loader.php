@@ -483,6 +483,9 @@ class Loader
         // the reference so that it can be garbage-collected:
         $this->packageConfig = null;
 
+        // We want to keep whether we should autoboot the provider
+        $autoBoot = $this->config->get('redis-sentinel.auto_boot', false);
+
         if ($this->config->get('redis-sentinel.clean_config', true) === true) {
             $this->config->set('redis-sentinel', [
                 'Config merged. Set redis-sentinel.clean_config=false to keep.',
@@ -491,5 +494,7 @@ class Loader
 
         // Skip loading package config when cached:
         $this->config->set('redis-sentinel.load_config', false);
+        // Make sure autoboot is retained.
+        $this->config->set('redis-sentinel.auto_boot', $autoBoot);
     }
 }

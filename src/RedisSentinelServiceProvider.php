@@ -31,7 +31,7 @@ class RedisSentinelServiceProvider extends ServiceProvider
      *
      * @var boolean
      */
-    private $isBooted;
+    private $isBooted = false;
 
     /**
      * Loads the package's configuration and provides configuration values.
