@@ -104,13 +104,13 @@ class ApplicationFactory
     {
         $app = new \Illuminate\Foundation\Application(self::APP_PATH);
 
+        $app->config = new ConfigRepository();
+
         $app->register(new BroadcastServiceProvider($app));
         $app->register(new CacheServiceProvider($app));
         $app->register(new QueueServiceProvider($app));
         $app->register(new SessionServiceProvider($app));
         $app->register(new RedisServiceProvider($app));
-
-        $app->config = new ConfigRepository();
 
         Facade::setFacadeApplication($app);
 
