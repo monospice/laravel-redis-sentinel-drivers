@@ -7,6 +7,7 @@ php:
   - 7.0
   - 7.1
   - 7.2
+  - 7.3
 
 env:
   - LARAVEL_VERSION=">=5.4.0 <5.4.20"
@@ -17,10 +18,13 @@ env:
   - LARAVEL_VERSION="5.6.*" HORIZON=1
   - LARAVEL_VERSION="5.7.*"
   - LARAVEL_VERSION="5.7.*" HORIZON=1
+  - LARAVEL_VERSION="5.8.*"
+  - LARAVEL_VERSION="5.8.*" HORIZON=1
   - LUMEN_VERSION="5.4.*"
   - LUMEN_VERSION="5.5.*"
   - LUMEN_VERSION="5.6.*"
   - LUMEN_VERSION="5.7.*"
+  - LUMEN_VERSION="5.8.*"
 
 matrix:
   exclude:
@@ -42,6 +46,12 @@ matrix:
       env: LARAVEL_VERSION="5.7.*" HORIZON=1
     - php: 5.6
       env: LUMEN_VERSION="5.7.*"
+    - php: 5.6
+      env: LARAVEL_VERSION="5.8.*"
+    - php: 5.6
+      env: LARAVEL_VERSION="5.8.*" HORIZON=1
+    - php: 5.6
+      env: LUMEN_VERSION="5.8.*"
     - php: 7.0
       env: LARAVEL_VERSION="5.5.*" HORIZON=1
     - php: 7.0
@@ -56,6 +66,12 @@ matrix:
       env: LARAVEL_VERSION="5.7.*" HORIZON=1
     - php: 7.0
       env: LUMEN_VERSION="5.7.*"
+    - php: 7.0
+      env: LARAVEL_VERSION="5.8.*"
+    - php: 7.0
+      env: LARAVEL_VERSION="5.8.*" HORIZON=1
+    - php: 7.0
+      env: LUMEN_VERSION="5.8.*"
 
 before_install:
   - if [ -n "$LARAVEL_VERSION" ]; then composer remove --dev --no-update "laravel/lumen-framework"; fi
