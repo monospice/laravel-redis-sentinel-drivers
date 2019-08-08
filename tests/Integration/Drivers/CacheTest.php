@@ -76,9 +76,17 @@ class CacheTest extends IntegrationTestCase
     {
         $cacheKey = $this->prefix('test-key');
         $expected = 'test value';
-        $oneSecondInMinutes = 1 / 60;
 
-        $this->subject->put('test-key', $expected, $oneSecondInMinutes);
+        $appVersion = ApplicationFactory::getApplicationVersion();
+
+        // Laravel 5.8+ allows expression of cache expiration time in seconds:
+        if (version_compare($appVersion, '5.8', 'ge')) {
+            $expireAfter = 1; // Second
+        } else {
+            $expireAfter = 1 / 60; // Minutes
+        }
+
+        $this->subject->put('test-key', $expected, $expireAfter);
 
         $this->assertRedisKeyEquals($cacheKey, serialize($expected));
         usleep(1.2 * 1000000);
