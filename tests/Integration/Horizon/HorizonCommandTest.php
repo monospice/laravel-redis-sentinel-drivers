@@ -97,7 +97,7 @@ class HorizonCommandTest extends IntegrationTestCase
         $this->assertEquals(0, $this->artisan->call('horizon:continue'));
         $this->assertEquals(0, $this->artisan->call('horizon:terminate'));
 
-        usleep(15000);
+        usleep(1.5 * 1000000);
 
         $this->assertRedisSortedSetCount('horizon:masters', 0);
     }
