@@ -301,6 +301,17 @@ class LoaderTest extends TestCase
         $this->assertFalse($this->loader->shouldIntegrateHorizon);
     }
 
+    public function testChecksWtherPackageShouldAutoBoot()
+    {
+        $this->assertFalse($this->loader->shouldAutoBoot());
+
+        $this->config->set('redis-sentinel.auto_boot', true);
+        $this->assertTrue($this->loader->shouldAutoBoot());
+
+        $this->config->set('redis-sentinel.auto_boot', false);
+        $this->assertFalse($this->loader->shouldAutoBoot());
+    }
+
     public function testDetectsApplicationVersion()
     {
         $expected = ApplicationFactory::getApplicationVersion();
@@ -535,18 +546,6 @@ class LoaderTest extends TestCase
             $packageConfigKey = "redis-sentinel.$configKey";
             $this->assertTrue($this->config->has($packageConfigKey));
         }
-    }
-
-    public function testSetsAutoBootConfiguration()
-    {
-        // Test that it sets the boot value correctly
-        $this->config->set('redis-sentinel.auto_boot', false);
-        $this->loader->loadConfiguration();
-        $this->assertFalse($this->loader->shouldAutoBoot);
-
-        $this->config->set('redis-sentinel.auto_boot', true);
-        $this->loader->loadConfiguration();
-        $this->assertTrue($this->loader->shouldAutoBoot);
     }
 
     public function testNormalizesSentinelConnectionHosts()

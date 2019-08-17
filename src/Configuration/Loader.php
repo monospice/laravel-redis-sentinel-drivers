@@ -122,14 +122,6 @@ class Loader
      */
     public $shouldIntegrateHorizon;
 
-
-    /**
-     * Indicates whether this should auto-boot the provider immediately.
-     *
-     * @var bool
-     */
-    public $shouldAutoBoot;
-
     /**
      * The current Laravel or Lumen application instance that provides context
      * and services used to load the appropriate configuration.
@@ -211,8 +203,6 @@ class Loader
 
         $this->shouldIntegrateHorizon = $this->horizonAvailable
             && $this->config->get('horizon.driver') === 'redis-sentinel';
-
-        $this->shouldAutoBoot = $this->config->get('redis-sentinel.auto_boot', false);
     }
 
     /**
@@ -285,6 +275,25 @@ class Loader
     public function set($key, $value = null)
     {
         $this->config->set($key, $value);
+    }
+
+    /**
+     * Determine whether the package service provider should immediately boot
+     * the package services following the registration phase.
+     *
+     * Some third-party packages contain service providers that don't follow
+     * Laravel's boostrapping convention. These may reference this package's
+     * Sentinel drivers (cache, session, etc.) during the registration phase
+     * before this service provider finishes binding those in the boot phase
+     * afterward. An application can overcome the issue by setting the value
+     * of "redis-sentinel.auto_boot" to TRUE so that this provider boots the
+     * package's drivers during the registration phase.
+     *
+     * @return bool TRUE if the package is explicitly configured to auto-boot.
+     */
+    public function shouldAutoBoot()
+    {
+        return $this->config->get('redis-sentinel.auto_boot', false);
     }
 
     /**
@@ -485,7 +494,7 @@ class Loader
 
         if ($this->config->get('redis-sentinel.clean_config', true) === true) {
             $this->config->set('redis-sentinel', [
-                'auto_boot' => $this->config->get('redis-sentinel.auto_boot', false),
+                'auto_boot' => $this->shouldAutoBoot(),
                 'Config merged. Set redis-sentinel.clean_config=false to keep.',
             ]);
         }

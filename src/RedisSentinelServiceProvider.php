@@ -27,18 +27,18 @@ use Monospice\LaravelRedisSentinel\Manager\VersionedManagerFactory;
 class RedisSentinelServiceProvider extends ServiceProvider
 {
     /**
-     * Records whether this provider has already been booted (eg. via auto-boot)
-     *
-     * @var boolean
-     */
-    private $isBooted = false;
-
-    /**
      * Loads the package's configuration and provides configuration values.
      *
      * @var ConfigurationLoader
      */
     protected $config;
+
+    /**
+     * Records whether this provider has already been booted (eg. via auto-boot)
+     *
+     * @var boolean
+     */
+    private $isBooted = false;
 
     /**
      * Boot the service by registering extensions with Laravel's cache, queue,
@@ -48,7 +48,8 @@ class RedisSentinelServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        // Don't double boot the provider
+        // If we configured the package to boot its services immediately after
+        // the registration phase (auto-boot), don't boot the provider again:
         if ($this->isBooted) {
             return;
         }
@@ -89,9 +90,10 @@ class RedisSentinelServiceProvider extends ServiceProvider
             $this->registerOverrides();
         }
 
-        // We may need to boot this provider immediately to work around other
-        // providers calling Cache too early or Lumen 5.7 issues.
-        if ($this->config->shouldAutoBoot) {
+        // If we explicitly configured the package to auto-boot, run the boot
+        // phase now to bind the packages drivers. This overcomes issues with
+        // other third-party packages that don't follow Laravel's convention:
+        if ($this->config->shouldAutoBoot()) {
             $this->boot();
         }
     }
