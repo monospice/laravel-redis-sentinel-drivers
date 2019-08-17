@@ -3,6 +3,9 @@ Laravel Drivers for Redis Sentinel
 
 [![Build Status][travis-badge]][travis]
 [![Scrutinizer Code Quality][scrutinizer-badge]][scrutinizer]
+[![Latest Stable Version][packagist-stable-badge]][packagist-stable]
+[![Total Downloads][packagist-downloads-badge]][packagist-stable]
+[![License][license-badge]](#license)
 
 #### Redis Sentinel integration for Laravel and Lumen.
 
@@ -1204,8 +1207,12 @@ Sentinel Documentation][sentinel].
 [laravel-redis-api-docs]: https://laravel.com/docs/redis#interacting-with-redis
 [laravel-redis-docs]: https://laravel.com/docs/redis
 [laravel]: https://laravel.com
+[license-badge]: https://poser.pugx.org/monospice/laravel-redis-sentinel-drivers/license
 [lumen-redis-docs]: https://lumen.laravel.com/docs/cache
 [lumen]: https://lumen.laravel.com
+[packagist-downloads-badge]: https://poser.pugx.org/monospice/laravel-redis-sentinel-drivers/downloads
+[packagist-stable]: https://packagist.org/packages/monospice/laravel-redis-sentinel-drivers
+[packagist-stable-badge]: https://poser.pugx.org/monospice/laravel-redis-sentinel-drivers/v/stable
 [php-redis]: https://github.com/phpredis/phpredis
 [phpdotenv-usage-notes]: https://github.com/vlucas/phpdotenv#usage-notes
 [predis-docs]: https://github.com/nrk/predis/wiki
