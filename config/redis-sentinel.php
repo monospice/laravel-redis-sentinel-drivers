@@ -64,6 +64,12 @@ return [
     | values to the cache file. If the application uses this configuration
     | key for other purposes, set the value of "clean_config" to FALSE.
     |
+    | The "auto_boot" directive instructs the package to immediately boot its
+    | services after the registration phase. This allows applications to use
+    | Sentinel-backed services in service providers during the registration
+    | phase for compatibility with other packages that may use cache, session
+    | queue, and broadcasting features before the application boot phase.
+    |
     */
 
     'load_config' => true,

@@ -1002,6 +1002,12 @@ when `SESSION_DRIVER` equals `redis-sentinel`. It defaults to the package's
 internal, auto-configured *session* connection when unset unless the
 application configuration already contains a value for `session.connection`.
 
+### `REDIS_SENTINEL_AUTO_BOOT`
+
+When set to `true`, this flag instructs the package to boot the package after
+it registers its services without waiting for the application boot phase. This
+provides a way for applications that use Sentinel connections in other service
+providers to initialize the package immediately.
 
 Appendix: Configuration Examples
 --------------------------------
