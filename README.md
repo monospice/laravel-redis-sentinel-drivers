@@ -128,7 +128,8 @@ After [installing](#installation) the package, set the following in *.env*:
 ```shell
 CACHE_DRIVER=redis-sentinel
 SESSION_DRIVER=redis-sentinel
-QUEUE_DRIVER=redis-sentinel
+QUEUE_CONNECTION=redis-sentinel  # Laravel >= 5.7
+QUEUE_DRIVER=redis-sentinel      # Laravel <= 5.6
 REDIS_DRIVER=redis-sentinel
 
 REDIS_HOST=sentinel1.example.com, sentinel2.example.com, 10.0.0.1, etc.
@@ -217,7 +218,8 @@ change the following values as well:
 BROADCAST_DRIVER=redis-sentinel
 CACHE_DRIVER=redis-sentinel
 SESSION_DRIVER=redis-sentinel
-QUEUE_DRIVER=redis-sentinel
+QUEUE_CONNECTION=redis-sentinel  # Laravel >= 5.7
+QUEUE_DRIVER=redis-sentinel      # Laravel <= 5.6
 ```
 
 #### Connection-Specific Configuration
@@ -489,8 +491,8 @@ Add the following connection definition to *config/queue.php* in the
 ],
 ```
 
-...and change the `QUEUE_DRIVER` environment variable to `redis-sentinel` in
-*.env*.
+...and change the `QUEUE_CONNECTION` (Laravel 5.7+) or `QUEUE_DRIVER` (Laravel
+<= 5.6) environment variable to `redis-sentinel` in *.env*.
 
 If the application contains a specific connection in the `'redis-sentinel'`
 database configuration for the queue, replace `'connection' => 'default'` with
@@ -954,11 +956,14 @@ how it handles connections to Sentinel servers.
 Set the value of this variable to `redis-sentinel` to [override Laravel's
 standard Redis API][s-override-redis-api].
 
-### `BROADCAST_DRIVER`, `CACHE_DRIVER`, `SESSION_DRIVER`, `QUEUE_DRIVER`
+### `BROADCAST_DRIVER`, `CACHE_DRIVER`, `SESSION_DRIVER`, `QUEUE_CONNECTION`
 
 Laravel uses these to select the backends for the application broadcasting,
 cache, session, and queue services. Set the value to `redis-sentinel` for each
 service that the application should use Sentinel connections for.
+
+**Note:** Laravel 5.7 renamed `QUEUE_DRIVER` to `QUEUE_CONNECTION` in the
+default configuration files.
 
 ### `REDIS_{BROADCAST,CACHE,SESSION,QUEUE}_{HOST,PORT,PASSWORD,DATABASE,SERVICE}`
 
@@ -992,8 +997,9 @@ auto-configured *cache* connection when unset.
 ### `QUEUE_REDIS_CONNECTION`, `QUEUE_REDIS_SENTINEL_CONNECTION`
 
 The name of the Sentinel connection to select for the application queue when
-`QUEUE_DRIVER` equals `redis-sentinel`. It defaults to the package's internal,
-auto-configured *queue* connection when unset.
+`QUEUE_CONNECTION` (Laravel 5.7+) or `QUEUE_DRIVER` (Laravel <= 5.6) equals
+`redis-sentinel`. It defaults to the package's internal, auto-configured
+*queue* connection when unset.
 
 ### `SESSION_CONNECTION`
 
@@ -1033,7 +1039,7 @@ full set of Sentinel servers in production.
 
 CACHE_DRIVER=redis                CACHE_DRIVER=redis-sentinel
 SESSION_DRIVER=redis              SESSION_DRIVER=redis-sentinel
-QUEUE_DRIVER=redis                QUEUE_DRIVER=redis-sentinel
+QUEUE_CONNECTION=redis            QUEUE_CONNECTION=redis-sentinel
 
 REDIS_HOST=localhost              REDIS_HOST=sentinel1, sentinel2, sentinel3
 REDIS_PORT=6379                   REDIS_PORT=26379
