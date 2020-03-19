@@ -32,9 +32,17 @@ class ArtisanProcess extends Process
             var_export($connectionConfig, true)
         ));
 
-        parent::__construct(
-            (new PhpExecutableFinder())->find() . ' artisan ' . $command,
-            ApplicationFactory::APP_PATH
-        );
+        $command = [ (new PhpExecutableFinder())->find(), 'artisan', $command ];
+        $laravelVersion = ApplicationFactory::getApplicationVersion();
+
+        // Symfony removed support for string commands in newer versions. When
+        // running Laravel >= 7, pass the command as an array. Otherwise, send
+        // it as a string:
+        //
+        if (version_compare($laravelVersion, '7.0', 'lt')) {
+            $command = implode(' ', $command);
+        }
+
+        parent::__construct($command, ApplicationFactory::APP_PATH);
     }
 }
