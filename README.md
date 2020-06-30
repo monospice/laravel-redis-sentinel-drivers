@@ -1173,6 +1173,25 @@ Sentinel for something like a feed. For this setup, we'll configure multiple
 ],
 ```
 
+If you need a non-redis connection as well use the following syntax
+
+```
+'external_feed' => [
+
+            'options' => [
+                'host' => env('REDIS_SENTINEL_EXT', 'localhost'),
+                'password' => env('REDIS_SENTINEL_EXT_PASS', null),
+                'replication' => false,
+                'standalone' => true,
+                'port' => env('REDIS_SENTINEL_EXT_PORT', 6379),
+                'database' => env('REDIS_SENTINEL_EXT_DB', 1),
+                'read_write_timeout' => -1,
+            ]
+        ],
+
+```
+
+
 Notice that we removed the global `'options'` array and created a local
 `'options'` array for each connection. In this example setup, we store the
 application cache and sessions on one Redis server set, and feed data in
