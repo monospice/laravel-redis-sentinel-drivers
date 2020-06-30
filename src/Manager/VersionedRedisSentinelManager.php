@@ -2,6 +2,8 @@
 
 namespace Monospice\LaravelRedisSentinel\Manager;
 
+use Predis\Client;
+use Illuminate\Redis\Connections\PredisConnection;
 use Illuminate\Redis\RedisManager;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
@@ -40,6 +42,10 @@ abstract class VersionedRedisSentinelManager
     {
         $name = $name ?: 'default';
         $options = Arr::get($this->config, 'options', [ ]);
+        
+        if (isset($this->config[$name]['options']['standalone']) && $this->config[$name]['options']['standalone'] ) {
+            return new PredisConnection(new Client($this->config[$name]['options']));
+	    }
 
         if (isset($this->config[$name])) {
             return $this->connector()->connect($this->config[$name], $options);
