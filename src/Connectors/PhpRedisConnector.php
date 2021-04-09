@@ -7,6 +7,7 @@ use Monospice\LaravelRedisSentinel\Connections\PredisConnection;
 use Illuminate\Redis\Connectors\PhpRedisConnector as LaravelPhpRedisConnector;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
 use RedisSentinel;
+use RedisException;
 
 /**
  * Initializes PhpRedis Client instances for Redis Sentinel connections
@@ -24,7 +25,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      *
      * @var array
      */
-    protected $servers = [];
+    protected $servers;
 
     /**
      * Configuration options specific to Sentinel connection operation
@@ -58,6 +59,9 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      */
     public function connect(array $servers, array $options = [ ])
     {
+        // Set the initial Sentinel servers.
+        $this->servers = $servers;
+
         // Merge the global options shared by all Sentinel connections with
         // connection-specific options
         $clientOpts = array_merge($options, Arr::pull($servers, 'options', [ ]));
@@ -71,47 +75,69 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         $clientOpts = array_diff_key($clientOpts, $this->sentinelKeys);
 
         // Create a client by calling the Sentinel servers
-        $connector = function () use ($servers, $options) {
-            return $this->createClientWithSentinel($servers, $options);
+        $connector = function () use ($options) {
+            return $this->createClientWithSentinel($options);
         };
 
         return new PhpRedisConnection($connector(), $connector, $sentinelOpts);
     }
 
     /**
-     * Create the Redis client instance.
+     * Create the Redis client instance
      *
      * @param  array  $servers
      * @param  array  $options
      * @return \Redis
      */
-    protected function createClientWithSentinel(array $servers, array $options)
+    protected function createClientWithSentinel(array $options)
     {
+        $servers = $this->servers;
+
         shuffle($servers);
 
-        foreach ($servers as $server) {
+        foreach ($servers as $idx => $server) {
+            $host = $server['host'] ?? 'localhost';
+            $port = $server['port'] ?? 26739;
+            $service = $options['service'] ?? 'mymaster';
+
             $sentinel = new RedisSentinel(
-                $server['host'] ?? 'localhost',
-                $server['port'] ?? 26739,
+                $host,
+                $port,
                 $options['sentinel_timeout'] ?? 0,
                 $options['sentinel_persistent'] ?? null,
                 $options['retry_wait'] ?? 0,
                 $options['sentinel_read_timeout'] ?? 0,
             );
 
-            // @TODO update_sentinels
-            // $this->servers = $sentinel->sentinels($options['service'] ?? 'mymaster');
-            // var_dump($sentinel->sentinels($options['service'] ?? 'mymaster'));
-            // var_dump($sentinel->masters());
+            try {
+                if (($options['update_sentinels'] ?? false) === true) {
+                    $this->servers = array_merge(
+                        [
+                            [
+                                'host' => $host,
+                                'port' => $port,
+                            ]
+                        ], array_map(fn ($sentinel) => [
+                            'host' => $sentinel['ip'],
+                            'port' => $sentinel['port'],
+                        ], $sentinel->sentinels($service))
+                    );
+                }
 
-            $master = $sentinel->getMasterAddrByName($options['service'] ?? 'mymaster');
-            if ($master !== false) {
-                $config['host'] = $master[0];
-                $config['port'] = $master[1];
+                $master = $sentinel->getMasterAddrByName($service);
+                if (is_array($master) && count($master)) {
+                    $config['host'] = $master[0];
+                    $config['port'] = $master[1];
 
-                var_dump($config);
+                    // @TODO rewrite this config for auth.
 
-                return $this->createClient($config);
+                    return $this->createClient($config);
+                }
+            } catch (RedisException $e) {
+                // Only throw the exception if the last server can't connect
+                if ($idx === count($servers) - 1) {
+                    throw $e;
+                }
             }
         }
     }
