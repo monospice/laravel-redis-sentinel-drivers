@@ -3,7 +3,6 @@
 namespace Monospice\LaravelRedisSentinel\Connectors;
 
 use Illuminate\Support\Arr;
-use Monospice\LaravelRedisSentinel\Connections\PredisConnection;
 use Illuminate\Redis\Connectors\PhpRedisConnector as LaravelPhpRedisConnector;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
 use RedisSentinel;
@@ -14,7 +13,7 @@ use RedisException;
  *
  * @category Package
  * @package  Monospice\LaravelRedisSentinel
- * @author   Cy Rossignol <cy@rossignols.me>
+ * @author   Jeffrey Zant <j.zant@slash2.nl>
  * @license  See LICENSE file
  * @link     http://github.com/monospice/laravel-redis-sentinel-drivers
  */
@@ -30,9 +29,10 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     /**
      * Configuration options specific to Sentinel connection operation
      *
-     * We cannot pass these options as an array to the Predis client.
+     * @TODO rewrite doc.
+     * We cannot pass these options as an array to the PhpRedis client.
      * Instead, we'll set them on the connection directly using methods
-     * provided by the SentinelReplication class of the Predis package.
+     * provided by the SentinelReplication class of the PhpRedis package.
      *
      * @var array
      */
@@ -54,8 +54,8 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      * @param array $options The global client options shared by all Sentinel
      * connections
      *
-     * @return PredisConnection The Sentinel connection containing a configured
-     * Predis Client
+     * @return PhpRedisConnection The Sentinel connection containing a configured
+     * PhpRedis Client
      */
     public function connect(array $servers, array $options = [ ])
     {
@@ -95,7 +95,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
 
         shuffle($servers);
 
-        foreach ($servers as $idx => $server) {
+        foreach ($servers as $server) {
             $host = $server['host'] ?? 'localhost';
             $port = $server['port'] ?? 26739;
             $service = $options['service'] ?? 'mymaster';
@@ -125,20 +125,20 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                 }
 
                 $master = $sentinel->getMasterAddrByName($service);
-                if (is_array($master) && count($master)) {
-                    $config['host'] = $master[0];
-                    $config['port'] = $master[1];
-
-                    // @TODO rewrite this config for auth.
-
-                    return $this->createClient($config);
+                if (! is_array($master) || ! count($master)) {
+                    throw new RedisException(sprintf('No master found for service "%s".', $service));
                 }
+
+                return $this->createClient(array_merge(
+                    $options['parameters'] ?? [],
+                    $server,
+                    ['host' => $master[0], 'port' => $master[1]]
+                ));
             } catch (RedisException $e) {
-                // Only throw the exception if the last server can't connect
-                if ($idx === count($servers) - 1) {
-                    throw $e;
-                }
+                //
             }
         }
+
+        throw new RedisException('Could not create a client for the configured Sentinel servers.');
     }
 }

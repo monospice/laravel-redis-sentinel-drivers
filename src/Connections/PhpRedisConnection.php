@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Connections;
 
+use Closure;
 use Illuminate\Redis\Connections\PhpRedisConnection as LaravelPhpRedisConnection;
 use Redis;
 use RedisException;
@@ -9,13 +10,12 @@ use RedisException;
 /**
  * Executes Redis commands using the PhpRedis client.
  *
- * This package extends Laravel's PhpRedisConnection class to work around issues
- * experienced when using the PhpRedis client to send commands over "aggregate"
- * connections (in this case, Sentinel connections).
+ * This package extends Laravel's PhpRedisConnection class to wrap all command
+ * methods with a retryOnFailure method.
  *
  * @category Package
  * @package  Monospice\LaravelRedisSentinel
- * @author   @pdbreen, Cy Rossignol <cy@rossignols.me>
+ * @author   Jeffrey Zant <j.zant@slash2.nl>
  * @license  See LICENSE file
  * @link     https://github.com/monospice/laravel-redis-sentinel-drivers
  */
@@ -54,7 +54,79 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
     }
 
     /**
-     * Execute commands in a transaction.
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  mixed  $cursor
+     * @param  array  $options
+     * @return mixed
+     */
+    public function scan($cursor, $options = [])
+    {
+        return $this->retryOnFailure(function () use ($cursor, $options) {
+            return parent::scan($cursor, $options);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  string  $key
+     * @param  mixed  $cursor
+     * @param  array  $options
+     * @return mixed
+     */
+    public function zscan($key, $cursor, $options = [])
+    {
+        return $this->retryOnFailure(function () use ($key, $cursor, $options) {
+            parent::zscan($key, $cursor, $options);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  string  $key
+     * @param  mixed  $cursor
+     * @param  array  $options
+     * @return mixed
+     */
+    public function hscan($key, $cursor, $options = [])
+    {
+        return $this->retryOnFailure(function () use ($key, $cursor, $options) {
+            parent::hscan($key, $cursor, $options);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  string  $key
+     * @param  mixed  $cursor
+     * @param  array  $options
+     * @return mixed
+     */
+    public function sscan($key, $cursor, $options = [])
+    {
+        return $this->retryOnFailure(function () use ($key, $cursor, $options) {
+            parent::sscan($key, $cursor, $options);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  callable|null  $callback
+     * @return \Redis|array
+     */
+    public function pipeline(callable $callback = null)
+    {
+        return $this->retryOnFailure(function () use ($callback) {
+            return parent::pipeline($callback);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
      *
      * @param  callable|null  $callback
      * @return \Redis|array
@@ -62,25 +134,57 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
     public function transaction(callable $callback = null)
     {
         return $this->retryOnFailure(function () use ($callback) {
-            $transaction = $this->client()->multi();
-
-            return is_null($callback)
-                ? $transaction
-                : tap($transaction, $callback)->exec();
+            return parent::transaction($callback);
         });
     }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  array|string  $channels
+     * @param  \Closure  $callback
+     * @return void
+     */
+    public function subscribe($channels, Closure $callback)
+    {
+        return $this->retryOnFailure(function () use ($channels, $callback) {
+            return parent::subscribe($channels, $callback);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  array|string  $channels
+     * @param  \Closure  $callback
+     * @return void
+     */
+    public function psubscribe($channels, Closure $callback)
+    {
+        return $this->retryOnFailure(function () use ($channels, $callback) {
+            return parent::psubscribe($channels, $callback);
+        });
+    }
+
+    /**
+     * {@inheritdoc} in addition retry on client failure.
+     *
+     * @param  string  $method
+     * @param  array  $parameters
+     * @return mixed
+     */
+    public function command($method, array $parameters = [])
+    {
+        return $this->retryOnFailure(function () use ($method, $parameters) {
+            return parent::command($method, $parameters);
+        });
+    }
+
     /**
      * Attempt to retry the provided operation when the client fails to connect
      * to a Redis server.
      *
-     * We adapt Predis' Sentinel connection failure handling logic here to
-     * reproduce the high-availability mode provided by the actual client. To
-     * work around "aggregate" connection limitations in Predis, this class
-     * provides methods that don't use the high-level Sentinel connection API
-     * of Predis directly, so it needs to handle connection failures itself.
-     *
      * @param callable $callback The operation to execute.
-     *
      * @return mixed The result of the first successful attempt.
      *
      * @throws RedisException After exhausting the allowed number of
@@ -98,7 +202,12 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
 
                 usleep($this->retryWait * 1000);
 
-                $this->client = $this->connector();
+                try {
+                    $this->client = $this->connector();
+                } catch (RedisException $e) {
+                    // Ignore the the creation of a new client gets an exception.
+                    // If this exception isn't caught the retry will stop.
+                }
 
                 $attempts++;
             }
