@@ -129,7 +129,7 @@ before_install:
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 
 before_script:
-  - sudo pecl install redis
+  - pecl install redis
   - echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"`
   - SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
 
