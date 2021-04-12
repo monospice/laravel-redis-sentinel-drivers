@@ -49,8 +49,8 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
     {
         parent::__construct($client, $connector);
 
-        $this->retryLimit = (int) ($sentinelOptions['retry_limit'] ?? 20);
-        $this->retryWait = (int) ($sentinelOptions['retry_wait'] ?? 1000);
+        $this->retryLimit = (int) (isset($sentinelOptions['retry_limit']) ? $sentinelOptions['retry_limit'] : 20);
+        $this->retryWait = (int) (isset($sentinelOptions['retry_wait']) ? $sentinelOptions['retry_wait'] : 1000);
     }
 
     /**

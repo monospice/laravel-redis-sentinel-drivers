@@ -93,24 +93,30 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     {
         $servers = $this->servers;
 
+        // Shuffle the servers to perform some loadbalancing.
         shuffle($servers);
 
+        // Try to connect to any of the servers.
         foreach ($servers as $server) {
-            $host = $server['host'] ?? 'localhost';
-            $port = $server['port'] ?? 26739;
-            $service = $options['service'] ?? 'mymaster';
+            $host = isset($server['host']) ? $server['host'] : 'localhost';
+            $port = isset($server['port']) ? $server['port'] : 26739;
+            $service = isset($options['service']) ? $options['service'] : 'mymaster';
 
+            // Create a connection to the Sentinel instance.
             $sentinel = new RedisSentinel(
                 $host,
                 $port,
-                $options['sentinel_timeout'] ?? 0,
-                $options['sentinel_persistent'] ?? null,
-                $options['retry_wait'] ?? 0,
-                $options['sentinel_read_timeout'] ?? 0,
+                isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0,
+                isset($options['sentinel_persistent']) ? $options['sentinel_persistent'] : null,
+                isset($options['retry_wait']) ? $options['retry_wait'] : 0,
+                isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0,
             );
 
             try {
-                if (($options['update_sentinels'] ?? false) === true) {
+                // Check if the Sentinel server list needs to be updated.
+                // Put the current server and the other sentinels in the server list.
+                $updateSentinels = isset($options['update_sentinels']) ? $options['update_sentinels'] : false;
+                if ($updateSentinels === true) {
                     $this->servers = array_merge(
                         [
                             [
@@ -124,13 +130,15 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                     );
                 }
 
+                // Lookup the master node.
                 $master = $sentinel->getMasterAddrByName($service);
                 if (! is_array($master) || ! count($master)) {
                     throw new RedisException(sprintf('No master found for service "%s".', $service));
                 }
 
+                // Create a PhpRedis client for the selected master node.
                 return $this->createClient(array_merge(
-                    $options['parameters'] ?? [],
+                    isset($options['parameters']) ? $options['parameters'] : [],
                     $server,
                     ['host' => $master[0], 'port' => $master[1]]
                 ));
