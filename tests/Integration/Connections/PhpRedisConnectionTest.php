@@ -29,7 +29,7 @@ class PhpRedisConnectionTest extends IntegrationTestCase
     {
         parent::setUp();
 
-        $this->subject = $this->makeClient();
+        $this->subject = $this->makeConnection();
     }
 
     /**
@@ -99,7 +99,7 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
         $expectedRetries = 2;
 
-        $this->subject = $this->makeClient($expectedRetries, 0); // retry immediately
+        $this->subject = $this->makeConnection($expectedRetries, 0); // retry immediately
 
         $this->subject->transaction(function () {
             throw new RedisException();
@@ -111,7 +111,7 @@ class PhpRedisConnectionTest extends IntegrationTestCase
         $retries = 3;
         $attempts = 0;
 
-        $this->subject = $this->makeClient($retries, 0); // retry immediately
+        $this->subject = $this->makeConnection($retries, 0); // retry immediately
 
         $this->subject->transaction(function ($trans) use (&$attempts, $retries) {
             $attempts++;
@@ -133,9 +133,9 @@ class PhpRedisConnectionTest extends IntegrationTestCase
      *
      * @param int|null $retryLimit
      * @param int|null $retryWait
-     * @return Redis A client instance for the subject under test.
+     * @return PhpRedisConnection A client instance for the subject under test.
      */
-    protected function makeClient(int $retryLimit = null, int $retryWait = null)
+    protected function makeConnection(int $retryLimit = null, int $retryWait = null)
     {
         $connector = new PhpRedisConnector();
 

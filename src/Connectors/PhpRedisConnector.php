@@ -5,6 +5,7 @@ namespace Monospice\LaravelRedisSentinel\Connectors;
 use Illuminate\Support\Arr;
 use Illuminate\Redis\Connectors\PhpRedisConnector as LaravelPhpRedisConnector;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
+use Redis;
 use RedisSentinel;
 use RedisException;
 
@@ -85,9 +86,8 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     /**
      * Create the Redis client instance
      *
-     * @param  array  $servers
      * @param  array  $options
-     * @return \Redis
+     * @return Redis
      */
     protected function createClientWithSentinel(array $options)
     {
@@ -96,12 +96,13 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         $persistent = isset($options['sentinel_peristent']) ? $options['sentinel_peristent'] : null;
         $retryWait = isset($options['retry_wait']) ? $options['retry_wait'] : 0;
         $readTimeout = isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0;
+        $parameters = isset($options['parameters']) ? $options['parameters'] : [];
 
         // Shuffle the servers to perform some loadbalancing.
         shuffle($servers);
 
         // Try to connect to any of the servers.
-        foreach ($servers as $server) {
+        foreach ($servers as $idx => $server) {
             $host = isset($server['host']) ? $server['host'] : 'localhost';
             $port = isset($server['port']) ? $server['port'] : 26739;
             $service = isset($options['service']) ? $options['service'] : 'mymaster';
@@ -114,43 +115,56 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                 // Put the current server and the other sentinels in the server list.
                 $updateSentinels = isset($options['update_sentinels']) ? $options['update_sentinels'] : false;
                 if ($updateSentinels === true) {
-                    $this->servers = array_merge(
-                        [
-                            [
-                                'host' => $host,
-                                'port' => $port,
-                            ]
-                        ], array_map(fn ($sentinel) => [
-                            'host' => $sentinel['ip'],
-                            'port' => $sentinel['port'],
-                        ], $sentinel->sentinels($service))
-                    );
+                    $this->updateSentinels($sentinel, $host, $port, $service);
                 }
 
                 // Lookup the master node.
                 $master = $sentinel->getMasterAddrByName($service);
-                if (! is_array($master) || ! count($master)) {
+                if (is_array($master) && ! count($master)) {
                     throw new RedisException(sprintf('No master found for service "%s".', $service));
                 }
 
                 // Create a PhpRedis client for the selected master node.
-                return $this->createClient(array_merge(
-                    isset($options['parameters']) ? $options['parameters'] : [],
-                    $server,
-                    ['host' => $master[0], 'port' => $master[1]]
-                ));
+                return $this->createClient(
+                    array_merge($parameters, $server, ['host' => $master[0], 'port' => $master[1]])
+                );
             } catch (RedisException $e) {
-                //
+                // Rethrow the expection when the last server is reached.
+                if ($idx === count($servers) - 1) {
+                    throw $e;
+                }
             }
         }
+    }
 
-        throw new RedisException('Could not create a client for the configured Sentinel servers.');
+    /**
+     * Update the list With sentinel servers.
+     *
+     * @param RedisSentinel $sentinel
+     * @param string $currentHost
+     * @param int $currentPort
+     * @param string $service
+     * @return void
+     */
+    private function updateSentinels(RedisSentinel $sentinel, string $currentHost, int $currentPort, string $service)
+    {
+        $this->servers = array_merge(
+            [
+                [
+                    'host' => $currentHost,
+                    'port' => $currentPort,
+                ]
+            ], array_map(fn ($sentinel) => [
+                'host' => $sentinel['ip'],
+                'port' => $sentinel['port'],
+            ], $sentinel->sentinels($service))
+        );
     }
 
     /**
      * Format a server.
      *
-     * @param array $server
+     * @param mixed $server
      * @return array
      *
      * @throws RedisException
@@ -159,8 +173,11 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     {
         if (is_string($server)) {
             list($host, $port) = explode(':', $server);
+            if (! $host || ! $port) {
+                throw new RedisException('Could not format the server definition.');
+            }
 
-            return ['host' => $host, 'port' => $port];
+            return ['host' => $host, 'port' => (int) $port];
         }
 
         if (! is_array($server)) {
