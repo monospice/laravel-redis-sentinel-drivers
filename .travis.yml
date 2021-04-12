@@ -129,8 +129,16 @@ before_install:
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 
 before_script:
-  - pecl install redis
-  - echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"`
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.0" ]]; then printf "yes\n" | pecl install redis; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.1" ]]; then printf "yes\n" | pecl install redis; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.2" ]]; then printf "yes\n" | pecl install redis; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.3" ]]; then printf "yes\n" | pecl install redis; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.4" ]]; then printf "yes\n" | pecl install redis; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.0" ]]; then echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"; fi`
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.1" ]]; then echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"; fi`
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.2" ]]; then echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"; fi`
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.3" ]]; then echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"; fi`
+  - if [[ ${TRAVIS_PHP_VERSION:0:3} == "7.4" ]]; then echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"; fi`
   - SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
 
 script: vendor/bin/phpunit --exclude-group ${LUMEN_VERSION:+laravel-only},${HORIZON:-horizon}
