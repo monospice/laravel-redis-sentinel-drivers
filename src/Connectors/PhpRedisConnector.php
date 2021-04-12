@@ -29,10 +29,8 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     /**
      * Configuration options specific to Sentinel connection operation
      *
-     * @TODO rewrite doc.
-     * We cannot pass these options as an array to the PhpRedis client.
-     * Instead, we'll set them on the connection directly using methods
-     * provided by the SentinelReplication class of the PhpRedis package.
+     * Some of the Sentinel configuration options can be entered in this class.
+     * The retry_wait and retry_limit values are passed to the connection.
      *
      * @var array
      */
@@ -60,7 +58,9 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     public function connect(array $servers, array $options = [ ])
     {
         // Set the initial Sentinel servers.
-        $this->servers = $servers;
+        $this->servers = array_map(function ($server) {
+            return $this->formatServer($server);
+        }, $servers);
 
         // Merge the global options shared by all Sentinel connections with
         // connection-specific options
@@ -92,6 +92,10 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     protected function createClientWithSentinel(array $options)
     {
         $servers = $this->servers;
+        $timeout = isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0;
+        $persistent = isset($options['sentinel_peristent']) ? $options['sentinel_peristent'] : null;
+        $retryWait = isset($options['retry_wait']) ? $options['retry_wait'] : 0;
+        $readTimeout = isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0;
 
         // Shuffle the servers to perform some loadbalancing.
         shuffle($servers);
@@ -103,14 +107,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
             $service = isset($options['service']) ? $options['service'] : 'mymaster';
 
             // Create a connection to the Sentinel instance.
-            $sentinel = new RedisSentinel(
-                $host,
-                $port,
-                isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0,
-                isset($options['sentinel_persistent']) ? $options['sentinel_persistent'] : null,
-                isset($options['retry_wait']) ? $options['retry_wait'] : 0,
-                isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0,
-            );
+            $sentinel = new RedisSentinel($host, $port, $timeout, $persistent, $retryWait, $readTimeout);
 
             try {
                 // Check if the Sentinel server list needs to be updated.
@@ -148,5 +145,28 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         }
 
         throw new RedisException('Could not create a client for the configured Sentinel servers.');
+    }
+
+    /**
+     * Format a server.
+     *
+     * @param array $server
+     * @return array
+     *
+     * @throws RedisException
+     */
+    private function formatServer($server)
+    {
+        if (is_string($server)) {
+            list($host, $port) = explode(':', $server);
+
+            return ['host' => $host, 'port' => $port];
+        }
+
+        if (! is_array($server)) {
+            throw new RedisException('Could not format the server definition.');
+        }
+
+        return $server;
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Connections;
 
+use Monospice\LaravelRedisSentinel\Exceptions\RetryRedisException;
 use Closure;
 use Illuminate\Redis\Connections\PhpRedisConnection as LaravelPhpRedisConnection;
 use Redis;
@@ -203,7 +204,7 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
                 usleep($this->retryWait * 1000);
 
                 try {
-                    $this->client = $this->connector();
+                    $this->client = $this->connector ? call_user_func($this->connector) : $this->client;
                 } catch (RedisException $e) {
                     // Ignore the the creation of a new client gets an exception.
                     // If this exception isn't caught the retry will stop.
@@ -211,8 +212,8 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
 
                 $attempts++;
             }
-        } while ($attempts <= $this->retryLimit);
+        } while ($attempts < $this->retryLimit);
 
-        throw $exception;
+        throw new RetryRedisException(sprintf('Reached the reconnect limit of %d attempts', $attempts));
     }
 }
