@@ -154,10 +154,12 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                     'host' => $currentHost,
                     'port' => $currentPort,
                 ]
-            ], array_map(fn ($sentinel) => [
-                'host' => $sentinel['ip'],
-                'port' => $sentinel['port'],
-            ], $sentinel->sentinels($service))
+            ], array_map(function ($sentinel) {
+                return [
+                    'host' => $sentinel['ip'],
+                    'port' => $sentinel['port'],
+                ];
+            }, $sentinel->sentinels($service))
         );
     }
 

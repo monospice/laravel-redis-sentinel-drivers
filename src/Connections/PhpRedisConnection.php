@@ -2,7 +2,7 @@
 
 namespace Monospice\LaravelRedisSentinel\Connections;
 
-use Monospice\LaravelRedisSentinel\Exceptions\RetryRedisException;
+use Monospice\LaravelRedisSentinel\Exceptions\RedisRetryException;
 use Closure;
 use Illuminate\Redis\Connections\PhpRedisConnection as LaravelPhpRedisConnection;
 use Redis;
@@ -188,7 +188,7 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
      * @param callable $callback The operation to execute.
      * @return mixed The result of the first successful attempt.
      *
-     * @throws RedisException After exhausting the allowed number of
+     * @throws RedisRetryException After exhausting the allowed number of
      * attempts to reconnect.
      */
     protected function retryOnFailure(callable $callback)
@@ -214,6 +214,6 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
             }
         } while ($attempts < $this->retryLimit);
 
-        throw new RetryRedisException(sprintf('Reached the reconnect limit of %d attempts', $attempts));
+        throw new RedisRetryException(sprintf('Reached the reconnect limit of %d attempts', $attempts));
     }
 }

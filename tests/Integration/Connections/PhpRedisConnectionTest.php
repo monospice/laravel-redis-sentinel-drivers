@@ -7,7 +7,7 @@ use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
 use Monospice\LaravelRedisSentinel\Connectors\PhpRedisConnector;
 use Monospice\LaravelRedisSentinel\Tests\Support\DummyException;
 use Monospice\LaravelRedisSentinel\Tests\Support\IntegrationTestCase;
-use Monospice\LaravelRedisSentinel\Exceptions\RetryRedisException;
+use Monospice\LaravelRedisSentinel\Exceptions\RedisRetryException;
 use Redis;
 use RedisException;
 
@@ -95,11 +95,9 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testRetriesTransactionWhenConnectionFails()
     {
-        $this->expectException(RetryRedisException::class);
+        $this->expectException(RedisRetryException::class);
 
-        $expectedRetries = 2;
-
-        $this->subject = $this->makeConnection($expectedRetries, 0); // retry immediately
+        $this->subject = $this->makeConnection(1, 0); // retry once and immediately
 
         $this->subject->transaction(function () {
             throw new RedisException();

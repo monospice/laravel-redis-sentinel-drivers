@@ -128,6 +128,9 @@ before_install:
 
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 
-before_script: SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
+before_script:
+  - sudo pecl install redis
+  - echo "extension=redis.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"`
+  - SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
 
 script: vendor/bin/phpunit --exclude-group ${LUMEN_VERSION:+laravel-only},${HORIZON:-horizon}
