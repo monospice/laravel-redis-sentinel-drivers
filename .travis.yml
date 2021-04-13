@@ -130,7 +130,6 @@ before_install:
 
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 
-before_script:
-  - SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
+before_script: SUPERVISE=no travis_retry ./start-cluster.sh || { cat ./cluster/*.log; false; }
 
 script: vendor/bin/phpunit --exclude-group ${LUMEN_VERSION:+laravel-only},${HORIZON:-horizon}

@@ -29,8 +29,6 @@ class PhpRedisConnectionTest extends IntegrationTestCase
         parent::setUp();
 
         if (! extension_loaded('redis')) {
-            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
-
             return;
         }
 
@@ -39,6 +37,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testAllowsTransactionsOnAggregateConnection()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $transaction = $this->subject->transaction();
 
         $this->assertInstanceOf(Redis::class, $transaction);
@@ -46,6 +50,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testExecutesCommandsInTransaction()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $result = $this->subject->transaction(function ($trans) {
             $trans->set('test-key', 'test value');
             $trans->get('test-key');
@@ -59,6 +69,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testExecutesTransactionsOnMaster()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $expectedSubset = ['role' => 'master'];
 
         $info = $this->subject->transaction(function ($transaction) {
@@ -70,6 +86,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testAbortsTransactionOnException()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $exception = null;
 
         try {
@@ -88,6 +110,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testRetriesTransactionWhenConnectionFails()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $this->expectException(RedisRetryException::class);
 
         $this->subject = $this->makeConnection(1, 0); // retry once and immediately
@@ -99,6 +127,12 @@ class PhpRedisConnectionTest extends IntegrationTestCase
 
     public function testCanReconnectWhenConnectionFails()
     {
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $retries = 3;
         $attempts = 0;
 
