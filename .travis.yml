@@ -3,35 +3,35 @@ dist: trusty
 sudo: false
 
 php:
-#   - 5.6
+  - 5.6
   - 7.0
-#   - 7.1
-#   - 7.2
-#   - 7.3
-#   - 7.4
+  - 7.1
+  - 7.2
+  - 7.3
+  - 7.4
 
 env:
-#   - LARAVEL_VERSION=">=5.4.0 <5.4.20"
-#   - LARAVEL_VERSION=">=5.4.20 <5.5.0"
-#   - LARAVEL_VERSION="5.5.*"
-#   - LARAVEL_VERSION="5.5.*" HORIZON=1
-#   - LARAVEL_VERSION="5.6.*"
-#   - LARAVEL_VERSION="5.6.*" HORIZON=1
-#   - LARAVEL_VERSION="5.7.*"
-#   - LARAVEL_VERSION="5.7.*" HORIZON=1
-#   - LARAVEL_VERSION="5.8.*"
-#   - LARAVEL_VERSION="5.8.*" HORIZON=1
+  - LARAVEL_VERSION=">=5.4.0 <5.4.20"
+  - LARAVEL_VERSION=">=5.4.20 <5.5.0"
+  - LARAVEL_VERSION="5.5.*"
+  - LARAVEL_VERSION="5.5.*" HORIZON=1
+  - LARAVEL_VERSION="5.6.*"
+  - LARAVEL_VERSION="5.6.*" HORIZON=1
+  - LARAVEL_VERSION="5.7.*"
+  - LARAVEL_VERSION="5.7.*" HORIZON=1
+  - LARAVEL_VERSION="5.8.*"
+  - LARAVEL_VERSION="5.8.*" HORIZON=1
   - LARAVEL_VERSION="6.*"
-#   - LARAVEL_VERSION="6.*" HORIZON=1
-#   - LARAVEL_VERSION="7.*"
-#   - LARAVEL_VERSION="7.*" HORIZON=1
-#   - LUMEN_VERSION="5.4.*"
-#   - LUMEN_VERSION="5.5.*"
-#   - LUMEN_VERSION="5.6.*"
-#   - LUMEN_VERSION="5.7.*"
-#   - LUMEN_VERSION="5.8.*"
-#   - LUMEN_VERSION="6.*"
-#   - LUMEN_VERSION="7.*"
+  - LARAVEL_VERSION="6.*" HORIZON=1
+  - LARAVEL_VERSION="7.*"
+  - LARAVEL_VERSION="7.*" HORIZON=1
+  - LUMEN_VERSION="5.4.*"
+  - LUMEN_VERSION="5.5.*"
+  - LUMEN_VERSION="5.6.*"
+  - LUMEN_VERSION="5.7.*"
+  - LUMEN_VERSION="5.8.*"
+  - LUMEN_VERSION="6.*"
+  - LUMEN_VERSION="7.*"
 
 matrix:
   exclude:
@@ -126,8 +126,6 @@ before_install:
   - if [ -n "$LUMEN_VERSION" ]; then composer require --no-update "laravel/lumen-framework:$LUMEN_VERSION"; fi
   - if [ -z "$HORIZON" ]; then composer remove --dev --no-update "laravel/horizon"; fi
   - if [[ ${TRAVIS_PHP_VERSION:0:1} == "7" ]]; then printf "\n" | pecl install -f redis; fi
-  - if [[ ${TRAVIS_PHP_VERSION:0:1} == "7" ]]; then phpenv config-rm xdebug.ini; fi
-  - if [[ ${TRAVIS_PHP_VERSION:0:1} == "7" ]]; then echo "extension = redis.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini; fi
 
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 

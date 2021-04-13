@@ -23,6 +23,15 @@ use RedisException;
 class PhpRedisConnection extends LaravelPhpRedisConnection
 {
     /**
+     * The connection creation callback.
+     *
+     * Laravel 5 does not store the connector by default.
+     *
+     * @var callable
+     */
+    protected $connector;
+
+    /**
      * The number of times the client attempts to retry a command when it fails
      * to connect to a Redis instance behind Sentinel.
      *
@@ -49,6 +58,11 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
     public function __construct($client, callable $connector = null, array $sentinelOptions = [])
     {
         parent::__construct($client, $connector);
+
+        // Set the connector when it is not set. Used for Laravel 5.
+        if (! $this->connector) {
+            $this->connector = $connector;
+        }
 
         $this->retryLimit = (int) (isset($sentinelOptions['retry_limit']) ? $sentinelOptions['retry_limit'] : 20);
         $this->retryWait = (int) (isset($sentinelOptions['retry_wait']) ? $sentinelOptions['retry_wait'] : 1000);
