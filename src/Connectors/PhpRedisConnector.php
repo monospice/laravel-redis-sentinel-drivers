@@ -4,6 +4,7 @@ namespace Monospice\LaravelRedisSentinel\Connectors;
 
 use Illuminate\Support\Arr;
 use Illuminate\Redis\Connectors\PhpRedisConnector as LaravelPhpRedisConnector;
+use LogicException;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
 use Redis;
 use RedisSentinel;
@@ -88,10 +89,13 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      *
      * @param  array  $options
      * @return Redis
+     *
+     * @throws LogicException
      */
     protected function createClientWithSentinel(array $options)
     {
         $servers = $this->servers;
+        $service = isset($options['service']) ? $options['service'] : 'mymaster';
         $timeout = isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0;
         $persistent = isset($options['sentinel_peristent']) ? $options['sentinel_peristent'] : null;
         $retryWait = isset($options['retry_wait']) ? $options['retry_wait'] : 0;
@@ -101,11 +105,20 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         // Shuffle the servers to perform some loadbalancing.
         shuffle($servers);
 
+        // Check if the redis extension is enabled.
+        if (! extension_loaded('redis')) {
+            throw new LogicException('Please make sure the PHP Redis extension is installed and enabled.');
+        }
+
+        // Check if the extension is up to date and contains RedisSentinel.
+        if (! class_exists(RedisSentinel::class)) {
+            throw new LogicException('Please make sure the PHP Redis extension is up to date.');
+        }
+
         // Try to connect to any of the servers.
         foreach ($servers as $idx => $server) {
             $host = isset($server['host']) ? $server['host'] : 'localhost';
             $port = isset($server['port']) ? $server['port'] : 26739;
-            $service = isset($options['service']) ? $options['service'] : 'mymaster';
 
             // Create a connection to the Sentinel instance.
             $sentinel = new RedisSentinel($host, $port, $timeout, $persistent, $retryWait, $readTimeout);

@@ -2,7 +2,6 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests\Integration\Connections;
 
-use Mockery;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
 use Monospice\LaravelRedisSentinel\Connectors\PhpRedisConnector;
 use Monospice\LaravelRedisSentinel\Tests\Support\DummyException;
@@ -29,19 +28,13 @@ class PhpRedisConnectionTest extends IntegrationTestCase
     {
         parent::setUp();
 
+        if (! extension_loaded('redis')) {
+            $this->markTestSkipped('The redis extension is not installed. Please install the extension to enable '.__CLASS__);
+
+            return;
+        }
+
         $this->subject = $this->makeConnection();
-    }
-
-    /**
-     * Run this cleanup after each test.
-     *
-     * @return void
-     */
-    public function tearDown()
-    {
-        parent::tearDown();
-
-        Mockery::close();
     }
 
     public function testAllowsTransactionsOnAggregateConnection()
