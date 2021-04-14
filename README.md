@@ -59,9 +59,12 @@ Requirements
 
  - PHP 5.4 or greater
  - [Redis][redis] 2.8 or greater (for Sentinel support)
- - [Predis][predis] 1.1 or greater (for Sentinel client support)
  - [Laravel][laravel] or [Lumen][lumen] 5.0 or greater (4.x doesn't support the
    required Predis version)
+
+Driver options:
+ - [Predis][predis] 1.1 or greater (for Sentinel client support)
+ - [PhpRedis][php-redis] 5.3.4 or greater (for Sentinel client support)
 
 **Note:** Laravel 5.4 introduced the ability to use the [PhpRedis][php-redis]
 extension as a Redis client for the framework. This package does not yet
@@ -132,6 +135,7 @@ QUEUE_CONNECTION=redis-sentinel  # Laravel >= 5.7
 QUEUE_DRIVER=redis-sentinel      # Laravel <= 5.6
 REDIS_DRIVER=redis-sentinel
 
+REDIS_CLIENT=predis
 REDIS_HOST=sentinel1.example.com, sentinel2.example.com, 10.0.0.1, etc.
 REDIS_PORT=26379
 REDIS_SENTINEL_SERVICE=mymaster  # or your Redis master group name
@@ -406,6 +410,30 @@ for a single connection. The default values are shown below:
     // updated set of Sentinels each time the client needs to establish a
     // connection with a Redis master or replica.
     'update_sentinels' => false,
+],
+```
+
+The PhpRedis client supports extra options. The default values are shown below:
+
+```php
+'options' => [
+    ...
+
+    // The default number of attempts to retry the connection if the inititial
+    // connection has failed. A value of 0 instructs the
+    // client to throw an exception after the first failed attempt, while a
+    // value of -1 causes the client to continue to retry commands indefinitely.
+    'connector_retry_limit' => 20,
+
+    // The default amount of time (in milliseconds) that the client waits before
+    // retrying the connection attempt.
+    'connector_retry_wait' => 1000,
+
+    // Sets the persistent option in the RedisSentinel class.
+    'sentinel_persistent' => null,
+
+    // Sets the read timeout option in the RedisSentinel class. 0 means unlimited.
+    'sentinel_read_timeout' => 0,
 ],
 ```
 

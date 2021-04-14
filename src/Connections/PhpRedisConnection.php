@@ -226,7 +226,7 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
 
                 $attempts++;
             }
-        } while ($attempts < $this->retryLimit);
+        } while ($attempts <= $this->retryLimit);
 
         throw new RedisRetryException(sprintf('Reached the reconnect limit of %d attempts', $attempts));
     }

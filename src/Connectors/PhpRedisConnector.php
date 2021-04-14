@@ -6,6 +6,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Redis\Connectors\PhpRedisConnector as LaravelPhpRedisConnector;
 use LogicException;
 use Monospice\LaravelRedisSentinel\Connections\PhpRedisConnection;
+use Monospice\LaravelRedisSentinel\Exceptions\RedisRetryException;
 use Redis;
 use RedisSentinel;
 use RedisException;
@@ -27,6 +28,22 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      * @var array
      */
     protected $servers;
+
+    /**
+     * The number of times the client attempts to retry a command when it fails
+     * to connect to a Redis instance behind Sentinel.
+     *
+     * @var int
+     */
+    protected $retryLimit = 20;
+
+    /**
+     * The time in milliseconds to wait before the client retries a failed
+     * command.
+     *
+     * @var int
+     */
+    protected $retryWait = 1000;
 
     /**
      * Configuration options specific to Sentinel connection operation
@@ -64,6 +81,10 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
             return $this->formatServer($server);
         }, $servers);
 
+        // Set the connector options.
+        $this->retryLimit = (int) (isset($options['connector_retry_limit']) ? $options['connector_retry_limit'] : 20);
+        $this->retryWait = (int) (isset($options['connector_retry_wait']) ? $options['connector_retry_wait'] : 1000);
+
         // Merge the global options shared by all Sentinel connections with
         // connection-specific options
         $clientOpts = array_merge($options, Arr::pull($servers, 'options', [ ]));
@@ -81,7 +102,12 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
             return $this->createClientWithSentinel($options);
         };
 
-        return new PhpRedisConnection($connector(), $connector, $sentinelOpts);
+        // Create a connection and retry if this fails.
+        $connection = $this->retryOnFailure(function () use ($connector) {
+            return $connector();
+        });
+
+        return new PhpRedisConnection($connection, $connector, $sentinelOpts);
     }
 
     /**
@@ -138,9 +164,10 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                 }
 
                 // Create a PhpRedis client for the selected master node.
-                return $this->createClient(
-                    array_merge($parameters, $server, ['host' => $master[0], 'port' => $master[1]])
-                );
+                return $this->createClient(array_merge($parameters, $server, [
+                    'host' => $master[0],
+                    'port' => $master[1],
+                ]));
             } catch (RedisException $e) {
                 // Rethrow the expection when the last server is reached.
                 if ($idx === count($servers) - 1) {
@@ -148,6 +175,35 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
                 }
             }
         }
+    }
+
+    /**
+     * Retry the callback when a RedisException is catched.
+     *
+     * @param callable $callback The operation to execute.
+     * @return mixed The result of the first successful attempt.
+     *
+     * @throws RedisRetryException After exhausting the allowed number of
+     * attempts to connect.
+     */
+    protected function retryOnFailure(callable $callback)
+    {
+        $attempts = 0;
+        $previous = null;
+
+        do {
+            try {
+                return $callback();
+            } catch (RedisException $exception) {
+                $previous = $exception;
+
+                usleep($this->retryWait * 1000);
+
+                $attempts++;
+            }
+        } while ($attempts < $this->retryLimit);
+
+        throw new RedisRetryException(sprintf('Reached the connect limit of %d attempts', $attempts), 0, $previous);
     }
 
     /**
@@ -159,7 +215,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      * @param string $service
      * @return void
      */
-    private function updateSentinels(RedisSentinel $sentinel, string $currentHost, int $currentPort, string $service)
+    protected function updateSentinels(RedisSentinel $sentinel, string $currentHost, int $currentPort, string $service)
     {
         $this->servers = array_merge(
             [
@@ -184,7 +240,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      *
      * @throws RedisException
      */
-    private function formatServer($server)
+    protected function formatServer($server)
     {
         if (is_string($server)) {
             list($host, $port) = explode(':', $server);
