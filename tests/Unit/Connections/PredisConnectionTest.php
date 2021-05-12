@@ -102,7 +102,7 @@ class PredisConnectionTest extends TestCase
 
     public function testDisallowsInvalidSentinelOptions()
     {
-        $this->setExpectedException(BadMethodCallException::class);
+        $this->expectException(BadMethodCallException::class);
 
         new PredisConnection($this->clientMock, [ 'not_an_option' => null  ]);
     }

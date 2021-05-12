@@ -499,9 +499,9 @@ class LoaderTest extends TestCase
 
     public function testDisallowsUsingNonexistantConnectionForHorizon()
     {
-        $this->config->set('horizon.use', 'not-a-connection');
+        $this->expectException(UnexpectedValueException::class);
 
-        $this->setExpectedException(UnexpectedValueException::class);
+        $this->config->set('horizon.use', 'not-a-connection');
 
         $this->loader->loadHorizonConfiguration();
     }
