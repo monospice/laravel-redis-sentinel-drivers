@@ -35,7 +35,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      *
      * @var int
      */
-    protected $retryLimit = 20;
+    protected $connectorRetryLimit = 20;
 
     /**
      * The time in milliseconds to wait before the client retries a failed
@@ -43,7 +43,7 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      *
      * @var int
      */
-    protected $retryWait = 1000;
+    protected $connectorRetryWait = 1000;
 
     /**
      * Configuration options specific to Sentinel connection operation
@@ -64,6 +64,20 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
     ];
 
     /**
+     * Instantiate the connector and check if the required extension is available.
+     */
+    public function __construct()
+    {
+        if (! extension_loaded('redis')) {
+            throw new LogicException('Please make sure the PHP Redis extension is installed and enabled.');
+        }
+
+        if (! class_exists(RedisSentinel::class)) {
+            throw new LogicException('Please make sure the PHP Redis extension is up to date (5.3.4 or greater).');
+        }
+    }
+
+    /**
      * Create a new Redis Sentinel connection from the provided configuration
      * options
      *
@@ -81,9 +95,15 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
             return $this->formatServer($server);
         }, $servers);
 
-        // Set the connector options.
-        $this->retryLimit = (int) (isset($options['connector_retry_limit']) ? $options['connector_retry_limit'] : 20);
-        $this->retryWait = (int) (isset($options['connector_retry_wait']) ? $options['connector_retry_wait'] : 1000);
+        // Set the connector retry limit.
+        if (isset($options['connector_retry_limit']) && is_numeric($options['connector_retry_limit'])) {
+            $this->connectorRetryLimit = (int) $options['connector_retry_limit'];
+        }
+
+        // Set the connector retry wait.
+        if (isset($options['connector_retry_wait']) && is_numeric($options['connector_retry_wait'])) {
+            $this->connectorRetryWait = (int) $options['connector_retry_wait'];
+        }
 
         // Merge the global options shared by all Sentinel connections with
         // connection-specific options
@@ -103,9 +123,9 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         };
 
         // Create a connection and retry if this fails.
-        $connection = $this->retryOnFailure(function () use ($connector) {
+        $connection = self::retryOnFailure(function () use ($connector) {
             return $connector();
-        });
+        }, $this->connectorRetryLimit, $this->connectorRetryWait);
 
         return new PhpRedisConnection($connection, $connector, $sentinelOpts);
     }
@@ -120,90 +140,53 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
      */
     protected function createClientWithSentinel(array $options)
     {
-        $servers = $this->servers;
-        $service = isset($options['service']) ? $options['service'] : 'mymaster';
-        $timeout = isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0;
-        $persistent = isset($options['sentinel_peristent']) ? $options['sentinel_peristent'] : null;
-        $retryWait = isset($options['retry_wait']) ? $options['retry_wait'] : 0;
-        $readTimeout = isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0;
-        $parameters = isset($options['parameters']) ? $options['parameters'] : [];
+        $serverConfigurations = $this->servers;
+        $clientConfiguration = isset($options['parameters']) ? $options['parameters'] : [];
 
-        // Shuffle the servers to perform some loadbalancing.
-        shuffle($servers);
+        $updateSentinels = isset($options['update_sentinels']) ? $options['update_sentinels'] : false;
+        $sentinelService = isset($options['service']) ? $options['service'] : 'mymaster';
+        $sentinelTimeout = isset($options['sentinel_timeout']) ? $options['sentinel_timeout'] : 0;
+        $sentinelPersistent = isset($options['sentinel_persistent']) ? $options['sentinel_persistent'] : null;
+        $sentinelReadTimeout = isset($options['sentinel_read_timeout']) ? $options['sentinel_read_timeout'] : 0;
 
-        // Check if the redis extension is enabled.
-        if (! extension_loaded('redis')) {
-            throw new LogicException('Please make sure the PHP Redis extension is installed and enabled.');
-        }
-
-        // Check if the extension is up to date and contains RedisSentinel.
-        if (! class_exists(RedisSentinel::class)) {
-            throw new LogicException('Please make sure the PHP Redis extension is up to date.');
-        }
+        // Shuffle the server configurations to perform some loadbalancing.
+        shuffle($serverConfigurations);
 
         // Try to connect to any of the servers.
-        foreach ($servers as $idx => $server) {
-            $host = isset($server['host']) ? $server['host'] : 'localhost';
-            $port = isset($server['port']) ? $server['port'] : 26739;
+        foreach ($serverConfigurations as $idx => $serverConfiguration) {
+            $host = isset($serverConfiguration['host']) ? $serverConfiguration['host'] : 'localhost';
+            $port = isset($serverConfiguration['port']) ? $serverConfiguration['port'] : 26379;
 
-            // Create a connection to the Sentinel instance.
-            $sentinel = new RedisSentinel($host, $port, $timeout, $persistent, $retryWait, $readTimeout);
+            // Create a connection to the Sentinel instance. Using a retry_interval of 0, retrying
+            // is done inside the PhpRedisConnection. Cannot seem to get the retry_interval to work:
+            // https://github.com/phpredis/phpredis/blob/37a90257d09b4efa75230769cf535484116b2b67/library.c#L343
+            $sentinel = new RedisSentinel($host, $port, $sentinelTimeout, $sentinelPersistent, 0, $sentinelReadTimeout);
 
             try {
                 // Check if the Sentinel server list needs to be updated.
                 // Put the current server and the other sentinels in the server list.
-                $updateSentinels = isset($options['update_sentinels']) ? $options['update_sentinels'] : false;
                 if ($updateSentinels === true) {
-                    $this->updateSentinels($sentinel, $host, $port, $service);
+                    $this->updateSentinels($sentinel, $host, $port, $sentinelService);
                 }
 
                 // Lookup the master node.
-                $master = $sentinel->getMasterAddrByName($service);
+                $master = $sentinel->getMasterAddrByName($sentinelService);
                 if (is_array($master) && ! count($master)) {
-                    throw new RedisException(sprintf('No master found for service "%s".', $service));
+                    throw new RedisException(sprintf('No master found for service "%s".', $sentinelService));
                 }
 
                 // Create a PhpRedis client for the selected master node.
-                return $this->createClient(array_merge($parameters, $server, [
+                return $this->createClient(array_merge($clientConfiguration, $serverConfiguration, [
                     'host' => $master[0],
                     'port' => $master[1],
                 ]));
             } catch (RedisException $e) {
                 // Rethrow the expection when the last server is reached.
-                if ($idx === count($servers) - 1) {
+                if ($idx === count($serverConfigurations) - 1) {
                     throw $e;
                 }
             }
         }
-    }
-
-    /**
-     * Retry the callback when a RedisException is catched.
-     *
-     * @param callable $callback The operation to execute.
-     * @return mixed The result of the first successful attempt.
-     *
-     * @throws RedisRetryException After exhausting the allowed number of
-     * attempts to connect.
-     */
-    protected function retryOnFailure(callable $callback)
-    {
-        $attempts = 0;
-        $previous = null;
-
-        do {
-            try {
-                return $callback();
-            } catch (RedisException $exception) {
-                $previous = $exception;
-
-                usleep($this->retryWait * 1000);
-
-                $attempts++;
-            }
-        } while ($attempts < $this->retryLimit);
-
-        throw new RedisRetryException(sprintf('Reached the connect limit of %d attempts', $attempts), 0, $previous);
     }
 
     /**
@@ -256,5 +239,41 @@ class PhpRedisConnector extends LaravelPhpRedisConnector
         }
 
         return $server;
+    }
+
+    /**
+     * Retry the callback when a RedisException is catched.
+     *
+     * @param callable $callback The operation to execute.
+     * @param int $retryLimit The number of times the retry is performed.
+     * @param int $retryWait The time in milliseconds to wait before retrying again.
+     * @param callable $failureCallback The operation to execute when a failure happens.
+     * @return mixed The result of the first successful attempt.
+     *
+     * @throws RedisRetryException After exhausting the allowed number of
+     * attempts to connect.
+     */
+    public static function retryOnFailure(callable $callback, int $retryLimit, int $retryWait, callable $failureCallback = null)
+    {
+        $attempts = 0;
+        $previousException = null;
+
+        while ($attempts < $retryLimit) {
+            try {
+                return $callback();
+            } catch (RedisException $exception) {
+                $previousException = $exception;
+
+                if ($failureCallback) {
+                    call_user_func($failureCallback);
+                }
+
+                usleep($retryWait * 1000);
+
+                $attempts++;
+            }
+        }
+
+        throw new RedisRetryException(sprintf('Reached the (re)connect limit of %d attempts', $attempts), 0, $previousException);
     }
 }

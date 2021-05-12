@@ -2,9 +2,9 @@
 
 namespace Monospice\LaravelRedisSentinel\Connections;
 
-use Monospice\LaravelRedisSentinel\Exceptions\RedisRetryException;
 use Closure;
 use Illuminate\Redis\Connections\PhpRedisConnection as LaravelPhpRedisConnection;
+use Monospice\LaravelRedisSentinel\Connectors\PhpRedisConnector;
 use Redis;
 use RedisException;
 
@@ -27,7 +27,7 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
      *
      * Laravel 5 does not store the connector by default.
      *
-     * @var callable
+     * @var callable|null
      */
     protected $connector;
 
@@ -64,8 +64,15 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
             $this->connector = $connector;
         }
 
-        $this->retryLimit = (int) (isset($sentinelOptions['retry_limit']) ? $sentinelOptions['retry_limit'] : 20);
-        $this->retryWait = (int) (isset($sentinelOptions['retry_wait']) ? $sentinelOptions['retry_wait'] : 1000);
+        // Set the retry limit.
+        if (isset($sentinelOptions['retry_limit']) && is_numeric($sentinelOptions['retry_limit'])) {
+            $this->retryLimit = (int) $sentinelOptions['retry_limit'];
+        }
+
+        // Set the retry wait.
+        if (isset($sentinelOptions['retry_wait']) && is_numeric($sentinelOptions['retry_wait'])) {
+            $this->retryWait = (int) $sentinelOptions['retry_wait'];
+        }
     }
 
     /**
@@ -201,33 +208,20 @@ class PhpRedisConnection extends LaravelPhpRedisConnection
      *
      * @param callable $callback The operation to execute.
      * @return mixed The result of the first successful attempt.
-     *
-     * @throws RedisRetryException After exhausting the allowed number of
-     * attempts to reconnect.
      */
     protected function retryOnFailure(callable $callback)
     {
-        $attempts = 0;
+        return PhpRedisConnector::retryOnFailure($callback, $this->retryLimit, $this->retryWait, function () {
+            $this->client->close();
 
-        do {
             try {
-                return $callback();
-            } catch (RedisException $exception) {
-                $this->client->close();
-
-                usleep($this->retryWait * 1000);
-
-                try {
-                    $this->client = $this->connector ? call_user_func($this->connector) : $this->client;
-                } catch (RedisException $e) {
-                    // Ignore the the creation of a new client gets an exception.
-                    // If this exception isn't caught the retry will stop.
+                if ($this->connector) {
+                    $this->client = call_user_func($this->connector);
                 }
-
-                $attempts++;
+            } catch (RedisException $e) {
+                // Ignore when the creation of a new client gets an exception.
+                // If this exception isn't caught the retry will stop.
             }
-        } while ($attempts <= $this->retryLimit);
-
-        throw new RedisRetryException(sprintf('Reached the reconnect limit of %d attempts', $attempts));
+        });
     }
 }

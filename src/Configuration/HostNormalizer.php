@@ -62,7 +62,7 @@ class HostNormalizer
     public static function normalizeConnections(array $connections)
     {
         foreach ($connections as $name => $connection) {
-            if ($name === 'client' || $name === 'options' || $name === 'clusters') {
+            if (in_array($name, ['client', 'options', 'clusters'])) {
                 continue;
             }
 
