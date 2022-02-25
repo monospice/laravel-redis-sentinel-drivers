@@ -200,10 +200,11 @@ class RedisSentinelServiceProviderTest extends TestCase
 
     public function testWaitsForBoot()
     {
+        $this->expectException(\InvalidArgumentException::class);
+
         $this->app->config->set('redis-sentinel.auto_boot', false);
         $this->provider->register();
 
-        $this->setExpectedException(\InvalidArgumentException::class);
 
         // It didn't auto boot
         $this->assertNull($this->app->cache->store('redis-sentinel'));

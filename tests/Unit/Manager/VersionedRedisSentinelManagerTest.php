@@ -2,7 +2,6 @@
 
 namespace Monospice\LaravelRedisSentinel\Tests\Unit;
 
-use Closure;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\RedisManager;
@@ -118,23 +117,23 @@ class VersionedRedisSentinelManagerTest extends TestCase
 
     public function testDisallowsRedisClusterConnections()
     {
-        $this->setExpectedException(InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->subject->connection('clustered_connection');
     }
 
     public function testFailsOnUndefinedConnection()
     {
-        $this->setExpectedException(InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->subject->connection('nonexistant_connection');
     }
 
     public function testFailsOnUnsupportedClientDriver()
     {
-        $this->setExpectedException(InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
-        $manager = $this->makeSubject('phpredis', [
+        $manager = $this->makeSubject('fakeredis', [
             'test_connection' => [ ],
         ]);
 

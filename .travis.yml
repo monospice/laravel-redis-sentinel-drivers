@@ -125,6 +125,7 @@ before_install:
   - if [ -n "$LUMEN_VERSION" ]; then composer remove --dev --no-update "laravel/framework"; fi
   - if [ -n "$LUMEN_VERSION" ]; then composer require --no-update "laravel/lumen-framework:$LUMEN_VERSION"; fi
   - if [ -z "$HORIZON" ]; then composer remove --dev --no-update "laravel/horizon"; fi
+  - if [[ ${TRAVIS_PHP_VERSION:0:1} == "7" ]]; then printf "\n" | pecl install -f redis; fi
 
 install: travis_retry composer install --prefer-dist --no-interaction --no-suggest
 
